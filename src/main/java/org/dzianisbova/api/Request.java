@@ -4,20 +4,44 @@ import java.util.HashMap;
 import java.util.Map;
 
 public class Request {
-    private final String url;
+    private final String baseUrl;
     private final HttpMethod httpMethod;
     private final Map<String, String> headers;
     private final Map<String, String> queryParams;
     private final String body;
-    private final String contentType;
+    private final boolean hasBody;
 
     public Request(Builder builder) {
-        this.url = builder.url;
+        this.baseUrl = builder.url;
         this.httpMethod = builder.httpMethod;
         this.headers = builder.headers;
         this.queryParams = builder.queryParams;
         this.body = builder.body;
-        this.contentType = builder.contentType;
+        this.hasBody = body != null && !body.isEmpty() && !body.isBlank() && httpMethod.supportBody();
+    }
+
+    public String getBaseUrl() {
+        return baseUrl;
+    }
+
+    public Map<String, String> getQueryParams() {
+        return queryParams;
+    }
+
+    public HttpMethod getHttpMethod() {
+        return httpMethod;
+    }
+
+    public Map<String, String> getHeaders() {
+        return headers;
+    }
+
+    public String getBody() {
+        return body;
+    }
+
+    public boolean hasBody() {
+        return hasBody;
     }
 
     public static class Builder {
@@ -26,7 +50,6 @@ public class Request {
         private Map<String, String> headers = new HashMap<>();
         private Map<String, String> queryParams = new HashMap<>();
         private String body;
-        private String contentType;
 
         public Builder(String url, HttpMethod httpMethod) {
             this.url = url;
@@ -45,11 +68,6 @@ public class Request {
 
         public Builder withBody(String body) {
             this.body = body;
-            return this;
-        }
-
-        public Builder withContentType(String contentType) {
-            this.contentType = contentType;
             return this;
         }
 

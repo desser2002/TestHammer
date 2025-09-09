@@ -5,5 +5,9 @@ public enum HttpMethod {
     POST,
     PUT,
     PATCH,
-    DELETE
+    DELETE;
+
+    public boolean supportBody() {
+        return this == POST || this == PUT || this == PATCH;
+    }
 }
