@@ -1,4 +1,4 @@
-package org.dzianisbova.response;
+package org.dzianisbova.domain.response;
 
 public class Response {
     private final int statusCode;

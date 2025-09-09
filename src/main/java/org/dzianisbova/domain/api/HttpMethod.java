@@ -1,4 +1,4 @@
-package org.dzianisbova.api;
+package org.dzianisbova.domain.api;
 
 public enum HttpMethod {
     GET,

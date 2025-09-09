@@ -1,4 +1,4 @@
-package org.dzianisbova.api;
+package org.dzianisbova.domain.api;
 
 import java.util.HashMap;
 import java.util.Map;

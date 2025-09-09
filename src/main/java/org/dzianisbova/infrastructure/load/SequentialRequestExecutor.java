@@ -1,8 +1,10 @@
-package org.dzianisbova.load;
+package org.dzianisbova.infrastructure.load;
 
-import org.dzianisbova.api.Request;
-import org.dzianisbova.logging.Logger;
-import org.dzianisbova.response.Response;
+import org.dzianisbova.domain.api.Request;
+import org.dzianisbova.domain.load.RequestExecutor;
+import org.dzianisbova.domain.logging.Logger;
+import org.dzianisbova.domain.metrics.StatisticsService;
+import org.dzianisbova.domain.response.Response;
 
 import java.net.URI;
 import java.net.URLEncoder;
@@ -14,10 +16,12 @@ import java.nio.charset.StandardCharsets;
 public class SequentialRequestExecutor implements RequestExecutor {
     private final Logger logger;
     private final HttpClient httpClient;
+    private final StatisticsService statistic;
 
-    public SequentialRequestExecutor(Logger logger, HttpClient httpClient) {
+    public SequentialRequestExecutor(Logger logger, HttpClient httpClient, StatisticsService statistic) {
         this.logger = logger;
         this.httpClient = httpClient;
+        this.statistic = statistic;
     }
 
     @Override
@@ -30,10 +34,14 @@ public class SequentialRequestExecutor implements RequestExecutor {
             long duration = System.currentTimeMillis() - startTime;
             Response response = new Response(httpResponse.statusCode(), httpResponse.body(), duration);
             logger.info(request, response);
+            statistic.recordSuccess(duration);
+
             return response;
         } catch (Exception e) {
             long duration = System.currentTimeMillis() - startTime;
             logger.error(request, duration, e);
+            statistic.recordError(duration);
+
             return new Response(-1, e.getMessage(), duration);
         }
     }
