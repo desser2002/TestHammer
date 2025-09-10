@@ -6,3 +6,6 @@ The primary goal is to provide users with a fast-to-deploy tool that also offers
 * API request generation to facilitate efficient testing of web services.
 
 This library aims to simplify and accelerate the process of load testing, enabling rapid deployment of realistic load scenarios that closely mimic real-world usage.
+
+## Documnets
+* [UML Class Diagramm](https://drive.google.com/file/d/1FC53BNXWZi3DvxtHwyBma-IkCdWxbL-0/view?usp=sharing)
