@@ -18,6 +18,7 @@ public class SequentialRequestExecutor implements RequestExecutor {
     private final HttpClient httpClient;
     private final StatisticsService statistic;
 
+    //TODO решить нужен ли и логер и статистик сервис
     public SequentialRequestExecutor(Logger logger, HttpClient httpClient, StatisticsService statistic) {
         this.logger = logger;
         this.httpClient = httpClient;
@@ -47,7 +48,7 @@ public class SequentialRequestExecutor implements RequestExecutor {
     }
 
     private String buildFullUrl(Request request) {
-        StringBuilder url = new StringBuilder(request.getBaseUrl());
+        StringBuilder url = new StringBuilder(request.getUrl());
         var queryParams = request.getQueryParams();
         if (!queryParams.isEmpty()) {
             url.append("?");
@@ -65,7 +66,7 @@ public class SequentialRequestExecutor implements RequestExecutor {
     private HttpRequest buildHttpRequest(Request request, String fullUrl) {
         HttpRequest.Builder builder = HttpRequest.newBuilder().uri(URI.create(fullUrl));
         HttpRequest.BodyPublisher bodyPublisher = (request.hasBody())
-                ? HttpRequest.BodyPublishers.ofString(request.getBody())
+                ? HttpRequest.BodyPublishers.ofString(request.getRequestBody())
                 : HttpRequest.BodyPublishers.noBody();
         builder.method(request.getHttpMethod().name(), bodyPublisher);
         request.getHeaders().forEach(builder::header);

@@ -11,7 +11,7 @@ public interface StatisticsService {
 
     long getErrorCount();
 
-    long getAverageSuccessDuration();
+    double getAverageSuccessDuration();
 
     double getSuccessPercent();
 

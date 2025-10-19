@@ -36,8 +36,8 @@ public class InMemoryStatisticService implements StatisticsService {
     }
 
     @Override
-    public long getAverageSuccessDuration() {
-        return successRequests == 0 ? 0 : successDuration / successRequests;
+    public double getAverageSuccessDuration() {
+        return successRequests == 0 ? 0 : (double) successDuration / successRequests;
     }
 
     @Override

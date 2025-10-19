@@ -30,7 +30,7 @@ public class ConsoleStatisticsReporter implements StatisticReporter {
 
             CONSOLE.info("Report: Total={}, Success={}, Errors={}, Duration = {} ms, Success={}%",
                     total, success, errors,
-                    String.format("%.1f", durationAvg),
+                    String.format("%.3f", durationAvg),
                     String.format("%.2f", successPrecent));
         }, 0, intervalMillis, TimeUnit.MILLISECONDS);
     }
