@@ -42,7 +42,8 @@ public class SequentialRequestExecutor implements RequestExecutor {
             return response;
         } catch (Exception e) {
             Duration duration = Duration.between(startTime, Instant.now());
-            logger.error(request, duration, e);
+
+            logger.error(request, duration, Instant.now(), e);
             statistic.recordError(duration);
             if (e instanceof InterruptedException) {
                 Thread.currentThread().interrupt();
