@@ -5,14 +5,14 @@ import java.util.Map;
 
 public class Request {
     private final String url;
-    private final HttpMethod httpMethod;
+    private final HttpMethod method;
     private final Map<String, String> headers;
     private final Map<String, String> queryParams;
     private final String requestBody;
 
     public Request(Builder builder) {
         this.url = builder.url;
-        this.httpMethod = builder.method;
+        this.method = builder.method;
         this.headers = builder.headers;
         this.queryParams = builder.queryParams;
         this.requestBody = builder.requestBody;
@@ -26,8 +26,8 @@ public class Request {
         return queryParams;
     }
 
-    public HttpMethod getHttpMethod() {
-        return httpMethod;
+    public HttpMethod getMethod() {
+        return method;
     }
 
     public Map<String, String> getHeaders() {
@@ -77,20 +77,20 @@ public class Request {
         }
     }
 
-    public static class RequestBuilderWithBody extends Builder {
-        protected RequestBuilderWithBody(String url, HttpMethod httpMethod) {
-            super(url, httpMethod);
+    private static class BuilderWithBody extends Builder {
+        protected BuilderWithBody(String url, HttpMethod method) {
+            super(url, method);
         }
 
-        public RequestBuilderWithBody withBody(String body) {
-            this.requestBody = body;
+        public BuilderWithBody withBody(String requestBody) {
+            this.requestBody = requestBody;
             return this;
         }
     }
 
     public static RequestBuilder newBuilder(String url, HttpMethod method) {
         if (method.supportBody()) {
-            return new RequestBuilderWithBody(url, method);
+            return new BuilderWithBody(url, method);
         } else {
             return new Builder(url, method);
         }

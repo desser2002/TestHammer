@@ -7,6 +7,7 @@ import org.dzianisbova.domain.logging.Logger;
 import org.dzianisbova.domain.logging.SuccessLog;
 import org.dzianisbova.domain.response.Response;
 
+import java.time.Duration;
 import java.util.ArrayList;
 import java.util.Collections;
 import java.util.List;
@@ -23,7 +24,7 @@ public class InMemoryLogger implements Logger {
     }
 
     @Override
-    public void error(Request request, long duration, Throwable exception) {
+    public void error(Request request, Duration duration, Throwable exception) {
         Log log = new ErrorLog(request, duration, exception);
         synchronized (logs) {
             logs.add(log);

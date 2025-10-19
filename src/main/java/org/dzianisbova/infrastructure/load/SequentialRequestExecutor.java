@@ -12,6 +12,8 @@ import java.net.http.HttpClient;
 import java.net.http.HttpRequest;
 import java.net.http.HttpResponse;
 import java.nio.charset.StandardCharsets;
+import java.time.Duration;
+import java.time.Instant;
 
 public class SequentialRequestExecutor implements RequestExecutor {
     private final Logger logger;
@@ -29,19 +31,22 @@ public class SequentialRequestExecutor implements RequestExecutor {
     public Response execute(Request request) {
         String fullUrl = buildFullUrl(request);
         HttpRequest httpRequest = buildHttpRequest(request, fullUrl);
-        long startTime = System.currentTimeMillis();
+        Instant startTime = Instant.now();
         try {
             HttpResponse<String> httpResponse = httpClient.send(httpRequest, HttpResponse.BodyHandlers.ofString());
-            long duration = System.currentTimeMillis() - startTime;
+            Duration duration = Duration.between(startTime, Instant.now());
             Response response = new Response(httpResponse.statusCode(), httpResponse.body(), duration);
             logger.info(request, response);
             statistic.recordSuccess(duration);
 
             return response;
         } catch (Exception e) {
-            long duration = System.currentTimeMillis() - startTime;
+            Duration duration = Duration.between(startTime, Instant.now());
             logger.error(request, duration, e);
             statistic.recordError(duration);
+            if (e instanceof InterruptedException) {
+                Thread.currentThread().interrupt();
+            }
 
             return new Response(-1, e.getMessage(), duration);
         }
@@ -63,12 +68,12 @@ public class SequentialRequestExecutor implements RequestExecutor {
         return url.toString();
     }
 
-    private HttpRequest buildHttpRequest(Request request, String fullUrl) {
-        HttpRequest.Builder builder = HttpRequest.newBuilder().uri(URI.create(fullUrl));
+    private HttpRequest buildHttpRequest(Request request, String url) {
+        HttpRequest.Builder builder = HttpRequest.newBuilder().uri(URI.create(url));
         HttpRequest.BodyPublisher bodyPublisher = (request.hasBody())
                 ? HttpRequest.BodyPublishers.ofString(request.getRequestBody())
                 : HttpRequest.BodyPublishers.noBody();
-        builder.method(request.getHttpMethod().name(), bodyPublisher);
+        builder.method(request.getMethod().name(), bodyPublisher);
         request.getHeaders().forEach(builder::header);
         return builder.build();
     }

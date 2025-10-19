@@ -1,9 +1,11 @@
 package org.dzianisbova.domain.metrics;
 
-public interface StatisticsService {
-    void recordSuccess(long duration);
+import java.time.Duration;
 
-    void recordError(long duration);
+public interface StatisticsService {
+    void recordSuccess(Duration duration);
+
+    void recordError(Duration duration);
 
     long getTotalRequests();
 

@@ -1,11 +1,13 @@
 package org.dzianisbova.domain.response;
 
+import java.time.Duration;
+
 public class Response {
     private final int statusCode;
     private final String body;
-    private final long duration;
+    private final Duration duration;
 
-    public Response(int statusCode, String body, long duration) {
+    public Response(int statusCode, String body, Duration duration) {
         this.statusCode = statusCode;
         this.body = body;
         this.duration = duration;
@@ -19,7 +21,7 @@ public class Response {
         return body;
     }
 
-    public long getDuration() {
+    public Duration getDuration() {
         return duration;
     }
 }
