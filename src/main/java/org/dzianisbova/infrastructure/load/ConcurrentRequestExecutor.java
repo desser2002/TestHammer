@@ -23,10 +23,10 @@ public class ConcurrentRequestExecutor implements RequestExecutor {
     private final ExecutorService executor;
 
     public ConcurrentRequestExecutor(Logger logger, HttpClient httpClient,
-                                     StatisticsService statistic, ExecutorService executor) {
+                                     StatisticsService statisticsService, ExecutorService executor) {
         this.logger = logger;
         this.httpClient = httpClient;
-        this.statisticsService = statistic;
+        this.statisticsService = statisticsService;
         this.executor = executor;
     }
 
@@ -52,14 +52,18 @@ public class ConcurrentRequestExecutor implements RequestExecutor {
             logger.info(request, response);
             return response;
         } catch (Exception e) {
-            Duration failTime = Duration.between(startTime, Instant.now());
-            statisticsService.recordError(failTime);
-            logger.error(request, failTime, startTime, e);
-            if (e instanceof InterruptedException) {
-                Thread.currentThread().interrupt();
-            }
-            return new Response(-1, e.getMessage(), failTime);
+            return onFail(request, e, startTime);
         }
+    }
+
+    private Response onFail(Request request, Exception e, Instant startTime) {
+        Duration failTime = Duration.between(startTime, Instant.now());
+        statisticsService.recordError(failTime);
+        logger.error(request, failTime, startTime, e);
+        if (e instanceof InterruptedException) {
+            Thread.currentThread().interrupt();
+        }
+        return new Response(Response.ERROR_STATUS, e.getMessage(), failTime);
     }
 
     public void shutdown() {
