@@ -12,6 +12,7 @@ import java.net.http.HttpRequest;
 import java.net.http.HttpResponse;
 import java.time.Duration;
 import java.time.Instant;
+import java.util.List;
 
 public class SequentialRequestExecutor implements RequestExecutor {
     private final Logger logger;
@@ -47,5 +48,12 @@ public class SequentialRequestExecutor implements RequestExecutor {
 
             return new Response(-1, e.getMessage(), duration);
         }
+    }
+
+    @Override
+    public List<Response> executeAll(List<Request> requests) {
+        return requests.stream()
+                .map(this::execute)
+                .toList();
     }
 }
