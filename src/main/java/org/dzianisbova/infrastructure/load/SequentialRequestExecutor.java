@@ -19,7 +19,6 @@ public class SequentialRequestExecutor implements RequestExecutor {
     private final HttpClient httpClient;
     private final StatisticsService statistic;
 
-    //TODO решить нужен ли и логер и статистик сервис
     public SequentialRequestExecutor(Logger logger, HttpClient httpClient, StatisticsService statistic) {
         this.logger = logger;
         this.httpClient = httpClient;
