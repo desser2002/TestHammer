@@ -26,7 +26,7 @@ public class Main {
         RequestExecutor executor = new ConcurrentRequestExecutor(
                 new InMemoryLogger(), httpClient, statisticsService, executorService);
         StatisticReporter reporter = new ConsoleStatisticsReporter(statisticsService);
-        reporter.startReporting(5000);
+        reporter.startReporting(1000);
         int totalRequests = 50000;
         int batchSize = 100;
         for (int i = 0; i < totalRequests; i += batchSize) {
@@ -39,6 +39,7 @@ public class Main {
         }
 
         reporter.stopReporting();
+        statisticsService.reset();
         executorService.shutdown();
     }
 }

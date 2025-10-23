@@ -15,7 +15,9 @@ public interface StatisticsService {
 
     double getAverageSuccessDuration();
 
-    double getSuccessPercent();
+    long getMinSuccessDurationMillis();
+
+    long getMaxSuccessDurationMillis();
 
     void reset();
 }
