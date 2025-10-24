@@ -8,7 +8,7 @@ import org.dzianisbova.domain.metrics.StatisticsService;
 import org.dzianisbova.infrastructure.load.ConcurrentRequestExecutor;
 import org.dzianisbova.infrastructure.logging.InMemoryLogger;
 import org.dzianisbova.infrastructure.metrics.ConsoleStatisticsReporter;
-import org.dzianisbova.infrastructure.metrics.InMemoryStatisticService;
+import org.dzianisbova.infrastructure.metrics.PerThreadStatisticService;
 
 import java.net.http.HttpClient;
 import java.util.ArrayList;
@@ -20,7 +20,7 @@ public class Main {
     public static void main(String[] args) {
         Request request = new Request.Builder("http://localhost:8080/api/drivers", HttpMethod.GET).build();
         HttpClient httpClient = HttpClient.newHttpClient();
-        StatisticsService statisticsService = new InMemoryStatisticService();
+        StatisticsService statisticsService = new PerThreadStatisticService();
         int threadsCount = 20;
         ExecutorService executorService = Executors.newFixedThreadPool(threadsCount);
         RequestExecutor executor = new ConcurrentRequestExecutor(
