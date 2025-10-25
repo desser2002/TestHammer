@@ -20,4 +20,6 @@ public interface StatisticsService {
     long getMaxSuccessDurationMillis();
 
     void reset();
+
+    void refreshSnapshot();
 }

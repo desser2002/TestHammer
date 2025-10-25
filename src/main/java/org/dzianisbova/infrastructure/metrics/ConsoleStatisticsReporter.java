@@ -22,9 +22,7 @@ public class ConsoleStatisticsReporter implements StatisticReporter {
     public void startReporting(long intervalMillis) {
         scheduler.scheduleAtFixedRate(() ->
         {
-            if (service instanceof PerThreadStatisticService pts) {
-                pts.refreshSnapshot();
-            }
+            service.refreshSnapshot();
             long total = service.getTotalRequests();
             long success = service.getSuccessCount();
             long errors = service.getErrorCount();
