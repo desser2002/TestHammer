@@ -10,6 +10,7 @@ import org.dzianisbova.domain.metrics.StatisticReporter;
 import org.dzianisbova.domain.metrics.StatisticsService;
 
 import java.net.http.HttpClient;
+import java.time.Duration;
 import java.time.Instant;
 import java.util.ArrayList;
 import java.util.List;
@@ -44,18 +45,30 @@ public class DefaultLoadTestExecutor implements LoadTestExecutor {
     @Override
     public void executeTest(Request request, LoadConfig loadConfig, ReportConfig reportConfig) {
         initializeRequestExecutors(loadConfig);
-        Instant endTime = Instant.now().plus(loadConfig.getDuration());
-        int threads = loadConfig.getThreadsCount();
+        int threadsCount = loadConfig.getThreadsCount();
+        runWarmUp(request, threadsCount, loadConfig.getWarmUpDuration());
         statisticReporter.startReporting(reportConfig.reportIntervalMillis());
+        runLoad(request,threadsCount,loadConfig.getTestDuration());
+        statisticReporter.stopReporting();
+        statisticsService.reset();
+        executorService.shutdown();
+    }
+
+    private void runWarmUp(Request request, int threadsCount, Duration warmUpDuration) {
+        if (!warmUpDuration.isZero() && !warmUpDuration.isNegative()) {
+            runLoad(request,threadsCount,warmUpDuration);
+            statisticsService.reset();
+        }
+    }
+
+    private void runLoad(Request request, int threadsCount, Duration duration) {
+        Instant endTime = Instant.now().plus(duration);
         while (Instant.now().isBefore(endTime)) {
             List<Request> batch = new ArrayList<>();
-            for (int i = 0; i < threads; i++) {
+            for (int i = 0; i < threadsCount; i++) {
                 batch.add(request);
             }
             requestExecutor.executeAll(batch);
         }
-        statisticReporter.stopReporting();
-        statisticsService.reset();
-        executorService.shutdown();
     }
 }

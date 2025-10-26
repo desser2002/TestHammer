@@ -78,7 +78,9 @@ public class PerThreadStatisticService implements StatisticsService {
 
     @Override
     public void reset() {
-        allStats.clear();
+        for (ThreadStat stat : allStats) {
+            stat.resetCounters();
+        }
         threadStat.remove();
         statsSnapshot.set(null);
     }
