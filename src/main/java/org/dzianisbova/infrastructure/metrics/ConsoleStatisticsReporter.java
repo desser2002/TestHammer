@@ -22,16 +22,21 @@ public class ConsoleStatisticsReporter implements StatisticReporter {
     public void startReporting(long intervalMillis) {
         scheduler.scheduleAtFixedRate(() ->
         {
+            service.refreshSnapshot();
             long total = service.getTotalRequests();
             long success = service.getSuccessCount();
             long errors = service.getErrorCount();
             double durationAvg = service.getAverageSuccessDuration();
-            double successPrecent = service.getSuccessPercent() * 100;
+            long minDuration = service.getMinSuccessDurationMillis();
+            String minDurationStr = (minDuration == -1) ? "N/A" : Long.toString(minDuration);
+            long maxDuration = service.getMaxSuccessDurationMillis();
+            String maxDurationStr = (maxDuration == -1) ? "N/A" : Long.toString(maxDuration);
 
-            CONSOLE.info("Report: Total={}, Success={}, Errors={}, Duration = {} ms, Success={}%",
+            CONSOLE.info("Report: Total={}, Success={}, Errors={}, Avg Duration = {} ms, Min Duration = {} ms, Max Duration = {} ms",
                     total, success, errors,
                     String.format("%.3f", durationAvg),
-                    String.format("%.2f", successPrecent));
+                    minDurationStr,
+                    maxDurationStr);
         }, 0, intervalMillis, TimeUnit.MILLISECONDS);
     }
 
