@@ -44,10 +44,9 @@ public class DefaultLoadTestExecutor implements LoadTestExecutor {
     @Override
     public void executeTest(Request request, LoadConfig loadConfig, ReportConfig reportConfig) {
         initializeRequestExecutors(loadConfig);
-        statisticReporter.startReporting(reportConfig.reportIntervalMillis());
-
         Instant endTime = Instant.now().plus(loadConfig.getDuration());
         int threads = loadConfig.getThreadsCount();
+        statisticReporter.startReporting(reportConfig.reportIntervalMillis());
         while (Instant.now().isBefore(endTime)) {
             List<Request> batch = new ArrayList<>();
             for (int i = 0; i < threads; i++) {
