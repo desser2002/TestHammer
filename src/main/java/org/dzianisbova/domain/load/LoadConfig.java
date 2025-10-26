@@ -4,24 +4,31 @@ import java.time.Duration;
 
 public class LoadConfig {
     private final int threads;
-    private final Duration duration;
+    private final Duration testDuration;
+    private final Duration warmUpDuration;
 
     private LoadConfig(Builder builder) {
         this.threads = builder.threads;
-        this.duration = builder.duration;
+        this.testDuration = builder.testDuration;
+        this.warmUpDuration = builder.warmUpDuration;
     }
 
     public int getThreadsCount() {
         return threads;
     }
 
-    public Duration getDuration() {
-        return duration;
+    public Duration getTestDuration() {
+        return testDuration;
+    }
+
+    public Duration getWarmUpDuration() {
+        return warmUpDuration;
     }
 
     public static class Builder {
         private int threads = 1;
-        private Duration duration = Duration.ofMinutes(1);
+        private Duration testDuration = Duration.ofMinutes(1);
+        private Duration warmUpDuration = Duration.ZERO;
 
         public Builder threads(int threads) {
             this.threads = threads;
@@ -29,7 +36,12 @@ public class LoadConfig {
         }
 
         public Builder duration(Duration duration) {
-            this.duration = duration;
+            this.testDuration = duration;
+            return this;
+        }
+
+        public Builder warmUpDuration(Duration duration) {
+            this.warmUpDuration = duration;
             return this;
         }
 
@@ -37,8 +49,11 @@ public class LoadConfig {
             if (threads <= 0) {
                 throw new IllegalStateException("Threads count should be > 0");
             }
-            if (duration == null || duration.isZero() || duration.isNegative()) {
+            if (testDuration == null || testDuration.isZero() || testDuration.isNegative()) {
                 throw new IllegalStateException("Duration should be positive");
+            }
+            if (warmUpDuration == null || warmUpDuration.isNegative()) {
+                throw new IllegalArgumentException("Warm up duration should be 0 or more");
             }
             return new LoadConfig(this);
         }

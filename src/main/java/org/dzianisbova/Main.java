@@ -21,6 +21,7 @@ public class Main {
 
         LoadConfig loadConfig = new LoadConfig.Builder()
                 .threads(20)
+                .warmUpDuration(Duration.ofSeconds(10))
                 .duration(Duration.ofMinutes(2))
                 .build();
 
