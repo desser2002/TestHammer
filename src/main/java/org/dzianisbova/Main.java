@@ -2,44 +2,34 @@ package org.dzianisbova;
 
 import org.dzianisbova.domain.api.HttpMethod;
 import org.dzianisbova.domain.api.Request;
-import org.dzianisbova.domain.load.RequestExecutor;
+import org.dzianisbova.domain.load.LoadConfig;
+import org.dzianisbova.domain.load.LoadTestExecutor;
+import org.dzianisbova.domain.metrics.ReportConfig;
 import org.dzianisbova.domain.metrics.StatisticReporter;
 import org.dzianisbova.domain.metrics.StatisticsService;
-import org.dzianisbova.infrastructure.load.ConcurrentRequestExecutor;
+import org.dzianisbova.infrastructure.load.DefaultLoadTestExecutor;
 import org.dzianisbova.infrastructure.logging.InMemoryLogger;
 import org.dzianisbova.infrastructure.metrics.ConsoleStatisticsReporter;
 import org.dzianisbova.infrastructure.metrics.PerThreadStatisticService;
 
-import java.net.http.HttpClient;
-import java.util.ArrayList;
-import java.util.List;
-import java.util.concurrent.ExecutorService;
-import java.util.concurrent.Executors;
+import java.time.Duration;
 
 public class Main {
     public static void main(String[] args) {
         Request request = new Request.Builder("http://localhost:8080/api/drivers", HttpMethod.GET).build();
-        HttpClient httpClient = HttpClient.newHttpClient();
+
+
+        LoadConfig loadConfig = new LoadConfig.Builder()
+                .threads(20)
+                .duration(Duration.ofMinutes(2))
+                .build();
+
         StatisticsService statisticsService = new PerThreadStatisticService();
-        int threadsCount = 20;
-        ExecutorService executorService = Executors.newFixedThreadPool(threadsCount);
-        RequestExecutor executor = new ConcurrentRequestExecutor(
-                new InMemoryLogger(), httpClient, statisticsService, executorService);
         StatisticReporter reporter = new ConsoleStatisticsReporter(statisticsService);
-        reporter.startReporting(1000);
-        int totalRequests = 50000;
-        int batchSize = 100;
-        for (int i = 0; i < totalRequests; i += batchSize) {
-            List<Request> batch = new ArrayList<>();
-            for (int j = 0; j < batchSize && (i + j) < totalRequests; j++) {
-                batch.add(request);
-            }
+        ReportConfig reportConfig = new ReportConfig(1000);
 
-            executor.executeAll(batch);
-        }
+        LoadTestExecutor loadTestExecutor = new DefaultLoadTestExecutor(statisticsService, reporter, new InMemoryLogger());
 
-        reporter.stopReporting();
-        statisticsService.reset();
-        executorService.shutdown();
+        loadTestExecutor.executeTest(request, loadConfig, reportConfig);
     }
 }
