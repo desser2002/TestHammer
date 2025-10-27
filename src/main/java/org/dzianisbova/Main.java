@@ -1,6 +1,7 @@
 package org.dzianisbova;
 
 import org.dzianisbova.domain.api.HttpMethod;
+import org.dzianisbova.domain.api.LinearScenario;
 import org.dzianisbova.domain.api.Request;
 import org.dzianisbova.domain.load.LoadConfig;
 import org.dzianisbova.domain.load.LoadTestExecutor;
@@ -13,12 +14,13 @@ import org.dzianisbova.infrastructure.metrics.ConsoleStatisticsReporter;
 import org.dzianisbova.infrastructure.metrics.PerThreadStatisticService;
 
 import java.time.Duration;
+import java.util.List;
 
 public class Main {
     public static void main(String[] args) {
-        Request request = new Request.Builder("http://localhost:8080/api/drivers", HttpMethod.GET).build();
+        Request getAllDrivers = Request.newBuilder("http://localhost:8080/api/drivers", HttpMethod.GET).build();
 
-
+        Request getAllRides = Request.newBuilder("http://localhost:8080/api/rides", HttpMethod.GET).build();
         LoadConfig loadConfig = new LoadConfig.Builder()
                 .threads(20)
                 .warmUpDuration(Duration.ofSeconds(10))
@@ -31,6 +33,7 @@ public class Main {
 
         LoadTestExecutor loadTestExecutor = new DefaultLoadTestExecutor(statisticsService, reporter, new InMemoryLogger());
 
-        loadTestExecutor.executeTest(request, loadConfig, reportConfig);
+        List<Request> requests = List.of(getAllDrivers, getAllRides);
+        loadTestExecutor.executeTest(new LinearScenario(requests), loadConfig, reportConfig);
     }
 }

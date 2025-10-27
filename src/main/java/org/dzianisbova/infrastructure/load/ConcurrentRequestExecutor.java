@@ -12,36 +12,21 @@ import java.net.http.HttpRequest;
 import java.net.http.HttpResponse;
 import java.time.Duration;
 import java.time.Instant;
-import java.util.List;
-import java.util.concurrent.CompletableFuture;
-import java.util.concurrent.ExecutorService;
 
 public class ConcurrentRequestExecutor implements RequestExecutor {
     private final HttpClient httpClient;
     private final StatisticsService statisticsService;
     private final Logger logger;
-    private final ExecutorService executor;
 
     public ConcurrentRequestExecutor(Logger logger, HttpClient httpClient,
-                                     StatisticsService statisticsService, ExecutorService executor) {
+                                     StatisticsService statisticsService) {
         this.logger = logger;
         this.httpClient = httpClient;
         this.statisticsService = statisticsService;
-        this.executor = executor;
-    }
-
-    public List<Response> executeAll(List<Request> requests) {
-        List<CompletableFuture<Response>> responses = requests.stream()
-                .map(request -> CompletableFuture.supplyAsync(() -> execute(request), executor))
-                .toList();
-
-        return responses.stream()
-                .map(CompletableFuture::join)
-                .toList();
     }
 
     @Override
-    public Response execute(Request request) {
+    public void execute(Request request) {
         HttpRequest httpRequest = HttpRequestComposer.composeHttpRequest(request);
         Instant startTime = Instant.now();
         try {
@@ -50,23 +35,17 @@ public class ConcurrentRequestExecutor implements RequestExecutor {
             Response response = new Response(httpResponse.statusCode(), httpResponse.body(), responseTime);
             statisticsService.recordSuccess(responseTime);
             logger.info(request, response);
-            return response;
         } catch (Exception e) {
-            return onFail(request, e, startTime);
+            onFail(request, e, startTime);
         }
     }
 
-    private Response onFail(Request request, Exception e, Instant startTime) {
+    private void onFail(Request request, Exception e, Instant startTime) {
         Duration failTime = Duration.between(startTime, Instant.now());
         statisticsService.recordError(failTime);
         logger.error(request, failTime, startTime, e);
         if (e instanceof InterruptedException) {
             Thread.currentThread().interrupt();
         }
-        return new Response(Response.ERROR_STATUS, e.getMessage(), failTime);
-    }
-
-    public void shutdown() {
-        executor.shutdown();
     }
 }
