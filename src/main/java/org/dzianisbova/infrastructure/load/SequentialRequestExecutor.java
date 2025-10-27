@@ -12,14 +12,12 @@ import java.net.http.HttpRequest;
 import java.net.http.HttpResponse;
 import java.time.Duration;
 import java.time.Instant;
-import java.util.List;
 
 public class SequentialRequestExecutor implements RequestExecutor {
     private final Logger logger;
     private final HttpClient httpClient;
     private final StatisticsService statistic;
 
-    //TODO решить нужен ли и логер и статистик сервис
     public SequentialRequestExecutor(Logger logger, HttpClient httpClient, StatisticsService statistic) {
         this.logger = logger;
         this.httpClient = httpClient;
@@ -27,7 +25,7 @@ public class SequentialRequestExecutor implements RequestExecutor {
     }
 
     @Override
-    public Response execute(Request request) {
+    public void execute(Request request) {
         HttpRequest httpRequest = HttpRequestComposer.composeHttpRequest(request);
         Instant startTime = Instant.now();
         try {
@@ -37,7 +35,6 @@ public class SequentialRequestExecutor implements RequestExecutor {
             logger.info(request, response);
             statistic.recordSuccess(duration);
 
-            return response;
         } catch (Exception e) {
             Duration duration = Duration.between(startTime, Instant.now());
 
@@ -47,14 +44,7 @@ public class SequentialRequestExecutor implements RequestExecutor {
                 Thread.currentThread().interrupt();
             }
 
-            return new Response(-1, e.getMessage(), duration);
+            new Response(-1, e.getMessage(), duration);
         }
-    }
-
-    @Override
-    public List<Response> executeAll(List<Request> requests) {
-        return requests.stream()
-                .map(this::execute)
-                .toList();
     }
 }

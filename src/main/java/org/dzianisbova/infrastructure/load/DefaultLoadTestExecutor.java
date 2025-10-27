@@ -1,6 +1,6 @@
 package org.dzianisbova.infrastructure.load;
 
-import org.dzianisbova.domain.api.Request;
+import org.dzianisbova.domain.api.Scenario;
 import org.dzianisbova.domain.load.LoadConfig;
 import org.dzianisbova.domain.load.LoadTestExecutor;
 import org.dzianisbova.domain.load.RequestExecutor;
@@ -38,37 +38,36 @@ public class DefaultLoadTestExecutor implements LoadTestExecutor {
         requestExecutor = new ConcurrentRequestExecutor(
                 logger,
                 httpClient,
-                statisticsService,
-                executorService);
+                statisticsService);
     }
 
     @Override
-    public void executeTest(Request request, LoadConfig loadConfig, ReportConfig reportConfig) {
+    public void executeTest(Scenario scenario, LoadConfig loadConfig, ReportConfig reportConfig) {
         initializeRequestExecutors(loadConfig);
         int threadsCount = loadConfig.getThreadsCount();
-        runWarmUp(request, threadsCount, loadConfig.getWarmUpDuration());
+        runWarmUp(scenario, threadsCount, loadConfig.getWarmUpDuration());
         statisticReporter.startReporting(reportConfig.reportIntervalMillis());
-        runLoad(request,threadsCount,loadConfig.getTestDuration());
+        runLoad(scenario,threadsCount,loadConfig.getTestDuration());
         statisticReporter.stopReporting();
         statisticsService.reset();
         executorService.shutdown();
     }
 
-    private void runWarmUp(Request request, int threadsCount, Duration warmUpDuration) {
+    private void runWarmUp(Scenario scenario, int threadsCount, Duration warmUpDuration) {
         if (!warmUpDuration.isZero() && !warmUpDuration.isNegative()) {
-            runLoad(request,threadsCount,warmUpDuration);
+            runLoad(scenario,threadsCount,warmUpDuration);
             statisticsService.reset();
         }
     }
 
-    private void runLoad(Request request, int threadsCount, Duration duration) {
+    private void runLoad(Scenario scenario, int threadsCount, Duration duration) {
         Instant endTime = Instant.now().plus(duration);
         while (Instant.now().isBefore(endTime)) {
-            List<Request> batch = new ArrayList<>();
+            List<Runnable> tasks = new ArrayList<>();
             for (int i = 0; i < threadsCount; i++) {
-                batch.add(request);
+               tasks.add(()-> scenario.run(requestExecutor));
             }
-            requestExecutor.executeAll(batch);
+            tasks.forEach(Runnable::run);
         }
     }
 }
