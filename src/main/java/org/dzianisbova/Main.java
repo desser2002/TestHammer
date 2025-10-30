@@ -1,6 +1,5 @@
 package org.dzianisbova;
 
-import org.dzianisbova.domain.api.HttpMethod;
 import org.dzianisbova.domain.api.LinearScenario;
 import org.dzianisbova.domain.api.Request;
 import org.dzianisbova.domain.load.LoadConfig;
@@ -18,9 +17,9 @@ import java.util.List;
 
 public class Main {
     public static void main(String[] args) {
-        Request getAllDrivers = Request.newBuilder("http://localhost:8080/api/drivers", HttpMethod.GET).build();
+        Request getAllDrivers = Request.get("http://localhost:8080/api/drivers").build();
 
-        Request getAllRides = Request.newBuilder("http://localhost:8080/api/rides", HttpMethod.GET).build();
+        Request getAllRides = Request.get("http://localhost:8080/api/rides").build();
         LoadConfig loadConfig = new LoadConfig.Builder()
                 .threads(20)
                 .warmUpDuration(Duration.ofSeconds(10))
