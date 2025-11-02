@@ -6,11 +6,17 @@ public class LoadConfig {
     private final int threads;
     private final Duration testDuration;
     private final Duration warmUpDuration;
+    private final double targetRps;
+
+    public double getTargetRps() {
+        return targetRps;
+    }
 
     private LoadConfig(Builder builder) {
         this.threads = builder.threads;
         this.testDuration = builder.testDuration;
         this.warmUpDuration = builder.warmUpDuration;
+        this.targetRps = builder.targetRps;
     }
 
     public int getThreadsCount() {
@@ -27,6 +33,7 @@ public class LoadConfig {
 
     public static class Builder {
         private int threads = 1;
+        private double targetRps;
         private Duration testDuration = Duration.ofMinutes(1);
         private Duration warmUpDuration = Duration.ZERO;
 
@@ -37,6 +44,11 @@ public class LoadConfig {
 
         public Builder duration(Duration duration) {
             this.testDuration = duration;
+            return this;
+        }
+
+        public Builder targetRps(double targetRps) {
+            this.targetRps = targetRps;
             return this;
         }
 
@@ -55,6 +67,7 @@ public class LoadConfig {
             if (warmUpDuration == null || warmUpDuration.isNegative()) {
                 throw new IllegalArgumentException("Warm up duration should be 0 or more");
             }
+            if (targetRps < 0) { throw new IllegalArgumentException("Target RPS cannot be negative"); }
             return new LoadConfig(this);
         }
     }
