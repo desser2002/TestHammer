@@ -1,22 +1,24 @@
 package org.dzianisbova.domain.load;
 
+import org.dzianisbova.domain.load.loadphase.LoadPhase;
+
 import java.time.Duration;
 
 public class LoadConfig {
     private final int threads;
     private final Duration testDuration;
     private final Duration warmUpDuration;
-    private final double targetRps;
-
-    public double getTargetRps() {
-        return targetRps;
-    }
+    private final LoadPhase loadPhase;
 
     private LoadConfig(Builder builder) {
         this.threads = builder.threads;
         this.testDuration = builder.testDuration;
         this.warmUpDuration = builder.warmUpDuration;
-        this.targetRps = builder.targetRps;
+        this.loadPhase = builder.loadPhase;
+    }
+
+    public LoadPhase getLoadPhase() {
+        return loadPhase;
     }
 
     public int getThreadsCount() {
@@ -33,9 +35,9 @@ public class LoadConfig {
 
     public static class Builder {
         private int threads = 1;
-        private double targetRps;
         private Duration testDuration = Duration.ofMinutes(1);
         private Duration warmUpDuration = Duration.ZERO;
+        private LoadPhase loadPhase;
 
         public Builder threads(int threads) {
             this.threads = threads;
@@ -47,8 +49,8 @@ public class LoadConfig {
             return this;
         }
 
-        public Builder targetRps(double targetRps) {
-            this.targetRps = targetRps;
+        public Builder loadPhase(LoadPhase loadPhase) {
+            this.loadPhase = loadPhase;
             return this;
         }
 
@@ -67,7 +69,9 @@ public class LoadConfig {
             if (warmUpDuration == null || warmUpDuration.isNegative()) {
                 throw new IllegalArgumentException("Warm up duration should be 0 or more");
             }
-            if (targetRps < 0) { throw new IllegalArgumentException("Target RPS cannot be negative"); }
+            if (loadPhase == null) {
+                throw new IllegalStateException("LoadPhase must be set");
+            }
             return new LoadConfig(this);
         }
     }
