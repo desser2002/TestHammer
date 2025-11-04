@@ -42,8 +42,7 @@ public class LinearStrategy implements RpsStrategy {
     @Override
     public void stop() {
         if (scheduler != null) {
-            scheduler.shutdownNow();
-            scheduler = null;
+            scheduler.shutdown();
         }
     }
 

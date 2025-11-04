@@ -25,9 +25,9 @@ public class Main {
         Request getAllRides = Request.get("http://localhost:8080/api/rides").build();
         LoadConfig loadConfig = new LoadConfig.Builder()
                 .threads(20)
-                .rpsStrategy(new LinearStrategy(0, 500, ofSeconds(30)))
+                .rpsStrategy(new LinearStrategy(0, 500, ofSeconds(10)))
                 .warmUpDuration(ofSeconds(2))
-                .duration(Duration.ofMinutes(2))
+                .duration(Duration.ofSeconds(20))
                 .build();
 
         StatisticsService statisticsService = new PerThreadStatisticService();
