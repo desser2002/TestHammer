@@ -4,6 +4,7 @@ import org.dzianisbova.domain.api.LinearScenario;
 import org.dzianisbova.domain.api.Request;
 import org.dzianisbova.domain.load.LoadConfig;
 import org.dzianisbova.domain.load.LoadTestExecutor;
+import org.dzianisbova.domain.load.rpsstrategy.LinearStrategy;
 import org.dzianisbova.domain.metrics.ReportConfig;
 import org.dzianisbova.domain.metrics.StatisticReporter;
 import org.dzianisbova.domain.metrics.StatisticsService;
@@ -15,6 +16,8 @@ import org.dzianisbova.infrastructure.metrics.PerThreadStatisticService;
 import java.time.Duration;
 import java.util.List;
 
+import static java.time.Duration.ofSeconds;
+
 public class Main {
     public static void main(String[] args) {
         Request getAllDrivers = Request.get("http://localhost:8080/api/drivers").build();
@@ -22,8 +25,8 @@ public class Main {
         Request getAllRides = Request.get("http://localhost:8080/api/rides").build();
         LoadConfig loadConfig = new LoadConfig.Builder()
                 .threads(20)
-                .targetRps(60)
-                .warmUpDuration(Duration.ofSeconds(10))
+                .rpsStrategy(new LinearStrategy(0, 500, ofSeconds(30)))
+                .warmUpDuration(ofSeconds(2))
                 .duration(Duration.ofMinutes(2))
                 .build();
 

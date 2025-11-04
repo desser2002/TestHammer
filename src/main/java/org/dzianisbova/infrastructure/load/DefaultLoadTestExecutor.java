@@ -5,11 +5,11 @@ import org.dzianisbova.domain.load.LoadConfig;
 import org.dzianisbova.domain.load.LoadTestExecutor;
 import org.dzianisbova.domain.load.RequestExecutor;
 import org.dzianisbova.domain.load.ratelimiter.RateLimiter;
+import org.dzianisbova.domain.load.rpsstrategy.RpsStrategy;
 import org.dzianisbova.domain.logging.Logger;
 import org.dzianisbova.domain.metrics.ReportConfig;
 import org.dzianisbova.domain.metrics.StatisticReporter;
 import org.dzianisbova.domain.metrics.StatisticsService;
-import org.dzianisbova.infrastructure.load.ratelimiter.NoOpRateLimiter;
 import org.dzianisbova.infrastructure.load.ratelimiter.TokenBucketRateLimiter;
 
 import java.net.http.HttpClient;
@@ -24,6 +24,7 @@ public class DefaultLoadTestExecutor implements LoadTestExecutor {
     private final StatisticsService statisticsService;
     private final StatisticReporter statisticReporter;
     private final Logger logger;
+    private RateLimiter rateLimiter;
     private static final long DEFAULT_TOKEN_BUCKET_CAPACITY = 1000;
 
     private ExecutorService executorService;
@@ -35,21 +36,6 @@ public class DefaultLoadTestExecutor implements LoadTestExecutor {
         this.logger = logger;
     }
 
-    private void initializeRequestExecutors(LoadConfig loadConfig) {
-        HttpClient httpClient;
-        httpClient = HttpClient.newHttpClient();
-        executorService = Executors.newFixedThreadPool(loadConfig.getThreadsCount());
-        RateLimiter rateLimiter;
-        if (loadConfig.getTargetRps() > 0) {
-            rateLimiter = new TokenBucketRateLimiter(loadConfig.getTargetRps(), DEFAULT_TOKEN_BUCKET_CAPACITY);
-        } else {
-            rateLimiter = new NoOpRateLimiter();
-        }
-        requestExecutor = new ConcurrentRequestExecutor(
-                logger,
-                httpClient,
-                statisticsService, rateLimiter);
-    }
 
     @Override
     public void executeTest(Scenario scenario, LoadConfig loadConfig, ReportConfig reportConfig) {
@@ -57,27 +43,43 @@ public class DefaultLoadTestExecutor implements LoadTestExecutor {
         int threadsCount = loadConfig.getThreadsCount();
         runWarmUp(scenario, threadsCount, loadConfig.getWarmUpDuration());
         statisticReporter.startReporting(reportConfig.reportIntervalMillis());
+        RpsStrategy rpsStrategy = loadConfig.getRpsStrategy();
+        rpsStrategy.setListener(rateLimiter::setTokensPerSecond);
+        rpsStrategy.start();
         runLoad(scenario, threadsCount, loadConfig.getTestDuration());
+        rpsStrategy.stop();
         statisticReporter.stopReporting();
         statisticsService.reset();
         executorService.shutdown();
     }
 
-    private void runWarmUp(Scenario scenario, int threadsCount, Duration warmUpDuration) {
-        if (!warmUpDuration.isZero() && !warmUpDuration.isNegative()) {
-            runLoad(scenario, threadsCount, warmUpDuration);
-            statisticsService.reset();
-        }
-    }
+private void initializeRequestExecutors(LoadConfig loadConfig) {
+    HttpClient httpClient;
+    httpClient = HttpClient.newHttpClient();
+    executorService = Executors.newFixedThreadPool(loadConfig.getThreadsCount());
+    double initialRps = loadConfig.getRpsStrategy().getStartRps();
+    rateLimiter = new TokenBucketRateLimiter(initialRps, DEFAULT_TOKEN_BUCKET_CAPACITY);
+    requestExecutor = new ConcurrentRequestExecutor(
+            logger,
+            httpClient,
+            statisticsService, rateLimiter);
+}
 
-    private void runLoad(Scenario scenario, int threadsCount, Duration duration) {
-        Instant endTime = Instant.now().plus(duration);
-        while (Instant.now().isBefore(endTime)) {
-            List<Runnable> tasks = new ArrayList<>();
-            for (int i = 0; i < threadsCount; i++) {
-                tasks.add(() -> scenario.run(requestExecutor));
-            }
-            tasks.forEach(Runnable::run);
-        }
+private void runWarmUp(Scenario scenario, int threadsCount, Duration warmUpDuration) {
+    if (!warmUpDuration.isZero() && !warmUpDuration.isNegative()) {
+        runLoad(scenario, threadsCount, warmUpDuration);
+        statisticsService.reset();
     }
+}
+
+private void runLoad(Scenario scenario, int threadsCount, Duration duration) {
+    Instant endTime = Instant.now().plus(duration);
+    while (Instant.now().isBefore(endTime)) {
+        List<Runnable> tasks = new ArrayList<>();
+        for (int i = 0; i < threadsCount; i++) {
+            tasks.add(() -> scenario.run(requestExecutor));
+        }
+        tasks.forEach(Runnable::run);
+    }
+}
 }
