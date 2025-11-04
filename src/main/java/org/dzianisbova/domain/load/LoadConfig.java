@@ -1,22 +1,20 @@
 package org.dzianisbova.domain.load;
 
+import org.dzianisbova.domain.load.rpsstrategy.RpsStrategy;
+
 import java.time.Duration;
 
 public class LoadConfig {
     private final int threads;
     private final Duration testDuration;
     private final Duration warmUpDuration;
-    private final double targetRps;
-
-    public double getTargetRps() {
-        return targetRps;
-    }
+    private final RpsStrategy rpsStrategy;
 
     private LoadConfig(Builder builder) {
         this.threads = builder.threads;
         this.testDuration = builder.testDuration;
         this.warmUpDuration = builder.warmUpDuration;
-        this.targetRps = builder.targetRps;
+        this.rpsStrategy = builder.rpsStrategy;
     }
 
     public int getThreadsCount() {
@@ -31,9 +29,13 @@ public class LoadConfig {
         return warmUpDuration;
     }
 
+    public RpsStrategy getRpsStrategy() {
+        return rpsStrategy;
+    }
+
     public static class Builder {
         private int threads = 1;
-        private double targetRps;
+        private RpsStrategy rpsStrategy;
         private Duration testDuration = Duration.ofMinutes(1);
         private Duration warmUpDuration = Duration.ZERO;
 
@@ -47,13 +49,13 @@ public class LoadConfig {
             return this;
         }
 
-        public Builder targetRps(double targetRps) {
-            this.targetRps = targetRps;
+        public Builder warmUpDuration(Duration duration) {
+            this.warmUpDuration = duration;
             return this;
         }
 
-        public Builder warmUpDuration(Duration duration) {
-            this.warmUpDuration = duration;
+        public Builder rpsStrategy(RpsStrategy rpsStrategy) {
+            this.rpsStrategy = rpsStrategy;
             return this;
         }
 
@@ -67,7 +69,9 @@ public class LoadConfig {
             if (warmUpDuration == null || warmUpDuration.isNegative()) {
                 throw new IllegalArgumentException("Warm up duration should be 0 or more");
             }
-            if (targetRps < 0) { throw new IllegalArgumentException("Target RPS cannot be negative"); }
+            if (rpsStrategy == null) {
+                throw new IllegalStateException("RpsStrategy must be set");
+            }
             return new LoadConfig(this);
         }
     }
