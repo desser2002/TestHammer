@@ -3,6 +3,7 @@ package org.dzianisbova.infrastructure.load;
 import org.dzianisbova.domain.api.Request;
 import org.dzianisbova.domain.load.HttpRequestComposer;
 import org.dzianisbova.domain.load.RequestExecutor;
+import org.dzianisbova.domain.load.ratelimiter.RateLimiter;
 import org.dzianisbova.domain.logging.Logger;
 import org.dzianisbova.domain.metrics.StatisticsService;
 import org.dzianisbova.domain.response.Response;
@@ -17,16 +18,25 @@ public class ConcurrentRequestExecutor implements RequestExecutor {
     private final HttpClient httpClient;
     private final StatisticsService statisticsService;
     private final Logger logger;
+    private final RateLimiter rateLimiter;
 
     public ConcurrentRequestExecutor(Logger logger, HttpClient httpClient,
-                                     StatisticsService statisticsService) {
+                                     StatisticsService statisticsService, RateLimiter rateLimiter) {
         this.logger = logger;
         this.httpClient = httpClient;
         this.statisticsService = statisticsService;
+        this.rateLimiter = rateLimiter;
     }
 
     @Override
     public void execute(Request request) {
+        try {
+            rateLimiter.acquire();
+        } catch (InterruptedException e) {
+            Thread.currentThread().interrupt();
+            return;
+        }
+
         HttpRequest httpRequest = HttpRequestComposer.composeHttpRequest(request);
         Instant startTime = Instant.now();
         try {

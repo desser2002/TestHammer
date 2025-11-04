@@ -4,10 +4,13 @@ import org.dzianisbova.domain.api.Scenario;
 import org.dzianisbova.domain.load.LoadConfig;
 import org.dzianisbova.domain.load.LoadTestExecutor;
 import org.dzianisbova.domain.load.RequestExecutor;
+import org.dzianisbova.domain.load.ratelimiter.RateLimiter;
 import org.dzianisbova.domain.logging.Logger;
 import org.dzianisbova.domain.metrics.ReportConfig;
 import org.dzianisbova.domain.metrics.StatisticReporter;
 import org.dzianisbova.domain.metrics.StatisticsService;
+import org.dzianisbova.infrastructure.load.ratelimiter.NoOpRateLimiter;
+import org.dzianisbova.infrastructure.load.ratelimiter.TokenBucketRateLimiter;
 
 import java.net.http.HttpClient;
 import java.time.Duration;
@@ -21,6 +24,7 @@ public class DefaultLoadTestExecutor implements LoadTestExecutor {
     private final StatisticsService statisticsService;
     private final StatisticReporter statisticReporter;
     private final Logger logger;
+    private static final long DEFAULT_TOKEN_BUCKET_CAPACITY = 1000;
 
     private ExecutorService executorService;
     private RequestExecutor requestExecutor;
@@ -35,10 +39,16 @@ public class DefaultLoadTestExecutor implements LoadTestExecutor {
         HttpClient httpClient;
         httpClient = HttpClient.newHttpClient();
         executorService = Executors.newFixedThreadPool(loadConfig.getThreadsCount());
+        RateLimiter rateLimiter;
+        if (loadConfig.getTargetRps() > 0) {
+            rateLimiter = new TokenBucketRateLimiter(loadConfig.getTargetRps(), DEFAULT_TOKEN_BUCKET_CAPACITY);
+        } else {
+            rateLimiter = new NoOpRateLimiter();
+        }
         requestExecutor = new ConcurrentRequestExecutor(
                 logger,
                 httpClient,
-                statisticsService);
+                statisticsService, rateLimiter);
     }
 
     @Override
@@ -47,7 +57,7 @@ public class DefaultLoadTestExecutor implements LoadTestExecutor {
         int threadsCount = loadConfig.getThreadsCount();
         runWarmUp(scenario, threadsCount, loadConfig.getWarmUpDuration());
         statisticReporter.startReporting(reportConfig.reportIntervalMillis());
-        runLoad(scenario,threadsCount,loadConfig.getTestDuration());
+        runLoad(scenario, threadsCount, loadConfig.getTestDuration());
         statisticReporter.stopReporting();
         statisticsService.reset();
         executorService.shutdown();
@@ -55,7 +65,7 @@ public class DefaultLoadTestExecutor implements LoadTestExecutor {
 
     private void runWarmUp(Scenario scenario, int threadsCount, Duration warmUpDuration) {
         if (!warmUpDuration.isZero() && !warmUpDuration.isNegative()) {
-            runLoad(scenario,threadsCount,warmUpDuration);
+            runLoad(scenario, threadsCount, warmUpDuration);
             statisticsService.reset();
         }
     }
@@ -65,7 +75,7 @@ public class DefaultLoadTestExecutor implements LoadTestExecutor {
         while (Instant.now().isBefore(endTime)) {
             List<Runnable> tasks = new ArrayList<>();
             for (int i = 0; i < threadsCount; i++) {
-               tasks.add(()-> scenario.run(requestExecutor));
+                tasks.add(() -> scenario.run(requestExecutor));
             }
             tasks.forEach(Runnable::run);
         }

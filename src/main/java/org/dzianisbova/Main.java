@@ -22,6 +22,7 @@ public class Main {
         Request getAllRides = Request.get("http://localhost:8080/api/rides").build();
         LoadConfig loadConfig = new LoadConfig.Builder()
                 .threads(20)
+                .targetRps(60)
                 .warmUpDuration(Duration.ofSeconds(10))
                 .duration(Duration.ofMinutes(2))
                 .build();
