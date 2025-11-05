@@ -91,7 +91,9 @@ public class DefaultLoadTestExecutor implements LoadTestExecutor {
             for (int i = 0; i < threadsCount; i++) {
                 tasks.add(() -> scenario.run(requestExecutor));
             }
-            tasks.forEach(Runnable::run);
+            for (Runnable task : tasks) {
+                executorService.submit(task);
+            }
         }
     }
 }
