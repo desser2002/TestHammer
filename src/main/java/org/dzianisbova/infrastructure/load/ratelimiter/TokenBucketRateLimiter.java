@@ -10,7 +10,7 @@ public class TokenBucketRateLimiter implements RateLimiter {
     private final Lock lock = new ReentrantLock();
     private double availableTokens;
     private long lastRefillTimeNanos;
-    private final double tokensPerSecond;
+    private volatile double tokensPerSecond;
     private final long capacity;
     private final Condition tokensAvailable = lock.newCondition();
     private static final double NANOS_PER_SECOND = 1_000_000_000.0;
@@ -53,6 +53,16 @@ public class TokenBucketRateLimiter implements RateLimiter {
                 return true;
             }
             return false;
+        } finally {
+            lock.unlock();
+        }
+    }
+
+    public void setTokensPerSecond(double tokensPerSecond) {
+        lock.lock();
+        try {
+            this.tokensPerSecond = tokensPerSecond;
+            this.lastRefillTimeNanos = System.nanoTime();
         } finally {
             lock.unlock();
         }

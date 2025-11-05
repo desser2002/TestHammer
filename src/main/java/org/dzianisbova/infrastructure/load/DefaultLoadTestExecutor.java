@@ -4,12 +4,14 @@ import org.dzianisbova.domain.api.Scenario;
 import org.dzianisbova.domain.load.LoadConfig;
 import org.dzianisbova.domain.load.LoadTestExecutor;
 import org.dzianisbova.domain.load.RequestExecutor;
+import org.dzianisbova.domain.load.loadphase.LinearRampUpCalculator;
+import org.dzianisbova.domain.load.loadphase.LoadPhase;
+import org.dzianisbova.domain.load.loadphase.LoadPhaseCalculator;
 import org.dzianisbova.domain.load.ratelimiter.RateLimiter;
 import org.dzianisbova.domain.logging.Logger;
 import org.dzianisbova.domain.metrics.ReportConfig;
 import org.dzianisbova.domain.metrics.StatisticReporter;
 import org.dzianisbova.domain.metrics.StatisticsService;
-import org.dzianisbova.infrastructure.load.ratelimiter.NoOpRateLimiter;
 import org.dzianisbova.infrastructure.load.ratelimiter.TokenBucketRateLimiter;
 
 import java.net.http.HttpClient;
@@ -19,6 +21,8 @@ import java.util.ArrayList;
 import java.util.List;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
+import java.util.concurrent.ScheduledExecutorService;
+import java.util.concurrent.TimeUnit;
 
 public class DefaultLoadTestExecutor implements LoadTestExecutor {
     private final StatisticsService statisticsService;
@@ -28,6 +32,8 @@ public class DefaultLoadTestExecutor implements LoadTestExecutor {
 
     private ExecutorService executorService;
     private RequestExecutor requestExecutor;
+
+    private RateLimiter rateLimiter;
 
     public DefaultLoadTestExecutor(StatisticsService statisticsService, StatisticReporter statisticReporter, Logger logger) {
         this.statisticsService = statisticsService;
@@ -39,12 +45,9 @@ public class DefaultLoadTestExecutor implements LoadTestExecutor {
         HttpClient httpClient;
         httpClient = HttpClient.newHttpClient();
         executorService = Executors.newFixedThreadPool(loadConfig.getThreadsCount());
-        RateLimiter rateLimiter;
-        if (loadConfig.getTargetRps() > 0) {
-            rateLimiter = new TokenBucketRateLimiter(loadConfig.getTargetRps(), DEFAULT_TOKEN_BUCKET_CAPACITY);
-        } else {
-            rateLimiter = new NoOpRateLimiter();
-        }
+
+        rateLimiter = new TokenBucketRateLimiter(loadConfig.getLoadPhase().getStartRps(), DEFAULT_TOKEN_BUCKET_CAPACITY);
+
         requestExecutor = new ConcurrentRequestExecutor(
                 logger,
                 httpClient,
@@ -55,12 +58,23 @@ public class DefaultLoadTestExecutor implements LoadTestExecutor {
     public void executeTest(Scenario scenario, LoadConfig loadConfig, ReportConfig reportConfig) {
         initializeRequestExecutors(loadConfig);
         int threadsCount = loadConfig.getThreadsCount();
+
+        LoadPhase loadPhase = loadConfig.getLoadPhase();
+        LoadPhaseCalculator calculator = new LinearRampUpCalculator(loadPhase);
+        Instant startTime = Instant.now();
         runWarmUp(scenario, threadsCount, loadConfig.getWarmUpDuration());
+        ScheduledExecutorService scheduler = Executors.newSingleThreadScheduledExecutor();
+        scheduler.scheduleAtFixedRate(() -> {
+            Duration elapsed = Duration.between(startTime, Instant.now());
+            double currentRps = calculator.getCurrentRps(elapsed);
+            rateLimiter.setTokensPerSecond(currentRps);
+        }, 0, 500, TimeUnit.MILLISECONDS);
         statisticReporter.startReporting(reportConfig.reportIntervalMillis());
         runLoad(scenario, threadsCount, loadConfig.getTestDuration());
         statisticReporter.stopReporting();
         statisticsService.reset();
         executorService.shutdown();
+        scheduler.shutdown();
     }
 
     private void runWarmUp(Scenario scenario, int threadsCount, Duration warmUpDuration) {
@@ -77,7 +91,9 @@ public class DefaultLoadTestExecutor implements LoadTestExecutor {
             for (int i = 0; i < threadsCount; i++) {
                 tasks.add(() -> scenario.run(requestExecutor));
             }
-            tasks.forEach(Runnable::run);
+            for (Runnable task : tasks) {
+                executorService.submit(task);
+            }
         }
     }
 }
