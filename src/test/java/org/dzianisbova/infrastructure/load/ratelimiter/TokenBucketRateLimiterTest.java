@@ -14,7 +14,6 @@ class TokenBucketRateLimiterTest {
         TokenBucketRateLimiter limiter = new TokenBucketRateLimiter(0.0, 1);
         limiter.acquire();
 
-
         CountDownLatch waitingStartedLatch = new CountDownLatch(1);
         CountDownLatch acquireFinishedLatch = new CountDownLatch(1);
 
