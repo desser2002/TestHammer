@@ -2,6 +2,7 @@ package org.dzianisbova.infrastructure.load.ratelimiter;
 
 import org.dzianisbova.domain.load.ratelimiter.RateLimiter;
 
+import java.time.Duration;
 import java.util.concurrent.locks.Condition;
 import java.util.concurrent.locks.Lock;
 import java.util.concurrent.locks.ReentrantLock;
@@ -14,6 +15,7 @@ public class TokenBucketRateLimiter implements RateLimiter {
     private final long capacity;
     private final Condition tokensAvailable = lock.newCondition();
     private static final double NANOS_PER_SECOND = 1_000_000_000.0;
+    private static final long MAX_POLL_INTERVAL_NANOS = Duration.ofMillis(300).toNanos();
 
     public TokenBucketRateLimiter(double tokensPerSecond, long capacity) {
         this.tokensPerSecond = tokensPerSecond;
@@ -63,6 +65,7 @@ public class TokenBucketRateLimiter implements RateLimiter {
         try {
             this.tokensPerSecond = tokensPerSecond;
             this.lastRefillTimeNanos = System.nanoTime();
+            refillTokens();
         } finally {
             lock.unlock();
         }
@@ -82,6 +85,10 @@ public class TokenBucketRateLimiter implements RateLimiter {
         if (availableTokens >= 1) {
             return 0;
         }
-        return (long) ((1 - availableTokens) * NANOS_PER_SECOND / tokensPerSecond);
+        if (tokensPerSecond <= 0) {
+            return MAX_POLL_INTERVAL_NANOS;
+        }
+        long interval = (long) ((1 - availableTokens) * NANOS_PER_SECOND / tokensPerSecond);
+        return Math.min(interval, MAX_POLL_INTERVAL_NANOS);
     }
 }
