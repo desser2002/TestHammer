@@ -5,6 +5,8 @@ import org.dzianisbova.domain.metrics.StatsSnapshot;
 import org.dzianisbova.domain.metrics.ThreadStat;
 
 import java.time.Duration;
+import java.util.ArrayList;
+import java.util.Comparator;
 import java.util.List;
 import java.util.concurrent.CopyOnWriteArrayList;
 import java.util.concurrent.atomic.AtomicReference;
@@ -72,6 +74,34 @@ public class PerThreadStatisticService implements StatisticsService {
         return val == 0 ? -1 : val;
     }
 
+    @Override
+    public long getPercentile50() {
+        StatsSnapshot snapshot = statsSnapshot.get();
+        if (snapshot == null) return -1;
+        return snapshot.p50();
+    }
+
+    @Override
+    public long getPercentile75() {
+        StatsSnapshot snapshot = statsSnapshot.get();
+        if (snapshot == null) return -1;
+        return snapshot.p75();
+    }
+
+    @Override
+    public long getPercentile95() {
+        StatsSnapshot snapshot = statsSnapshot.get();
+        if (snapshot == null) return -1;
+        return snapshot.p95();
+    }
+
+    @Override
+    public long getPercentile99() {
+        StatsSnapshot snapshot = statsSnapshot.get();
+        if (snapshot == null) return -1;
+        return snapshot.p99();
+    }
+
     public void refreshSnapshot() {
         statsSnapshot.set(aggregate());
     }
@@ -91,6 +121,7 @@ public class PerThreadStatisticService implements StatisticsService {
         long totalDuration = 0;
         long minDuration = Long.MAX_VALUE;
         long maxDuration = 0;
+        List<Long> allDurations = new ArrayList<>();
 
         for (ThreadStat stats : allStats) {
             totalSuccess += stats.getSuccess();
@@ -98,7 +129,25 @@ public class PerThreadStatisticService implements StatisticsService {
             totalDuration += stats.getTotalDuration();
             minDuration = Math.min(minDuration, stats.getMinDuration());
             maxDuration = Math.max(maxDuration, stats.getMaxDuration());
+            allDurations.addAll(stats.getDurations());
         }
-        return new StatsSnapshot(totalSuccess, totalErrors, totalDuration, minDuration, maxDuration);
+
+        long p50 = calculatePercentile(allDurations, 50);
+        long p75 = calculatePercentile(allDurations, 75);
+        long p95 = calculatePercentile(allDurations, 95);
+        long p99 = calculatePercentile(allDurations, 99);
+
+        return new StatsSnapshot(totalSuccess, totalErrors, totalDuration, minDuration, maxDuration, p50, p75, p95, p99);
+    }
+
+    private long calculatePercentile(List<Long> durations, double percentile) {
+        if (durations.isEmpty()) {
+            return -1;
+        }
+
+        durations.sort(Comparator.naturalOrder());
+        int index = (int) Math.ceil(percentile / 100.0 * durations.size()) - 1;
+        index = Math.clamp(index, 0, durations.size() - 1);
+        return durations.get(index);
     }
 }

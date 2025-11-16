@@ -19,6 +19,14 @@ public interface StatisticsService {
 
     long getMaxSuccessDurationMillis();
 
+    long getPercentile50();
+
+    long getPercentile75();
+
+    long getPercentile95();
+
+    long getPercentile99();
+
     void reset();
 
     void refreshSnapshot();

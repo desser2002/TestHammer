@@ -32,11 +32,21 @@ public class ConsoleStatisticsReporter implements StatisticReporter {
             long maxDuration = service.getMaxSuccessDurationMillis();
             String maxDurationStr = (maxDuration == -1) ? "N/A" : Long.toString(maxDuration);
 
-            CONSOLE.info("Report: Total={}, Success={}, Errors={}, Avg Duration = {} ms, Min Duration = {} ms, Max Duration = {} ms",
+
+            long p50 = service.getPercentile50();
+            long p75 = service.getPercentile75();
+            long p95 = service.getPercentile95();
+            long p99 = service.getPercentile99();
+            CONSOLE.info("Report: Total={}, Success={}, Errors={}, Avg Duration = {} ms, Min Duration = {} ms," +
+                            " Max Duration = {} ms, p50={} ms, p75={} ms, p95={} ms, p99={} ms",
                     total, success, errors,
                     String.format("%.3f", durationAvg),
                     minDurationStr,
-                    maxDurationStr);
+                    maxDurationStr,
+                    p50 == -1 ? "N/A" : p50,
+                    p75 == -1 ? "N/A" : p75,
+                    p95 == -1 ? "N/A" : p95,
+                    p99 == -1 ? "N/A" : p99);
         }, 0, intervalMillis, TimeUnit.MILLISECONDS);
     }
 
