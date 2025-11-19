@@ -19,6 +19,14 @@ public interface StatisticsService {
 
     long getMaxSuccessDurationMillis();
 
+    long getP50();
+
+    long getP90();
+
+    long getP95();
+
+    long getP99();
+
     void reset();
 
     void refreshSnapshot();

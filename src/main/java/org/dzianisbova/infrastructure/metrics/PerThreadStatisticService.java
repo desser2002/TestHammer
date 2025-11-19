@@ -5,6 +5,8 @@ import org.dzianisbova.domain.metrics.StatsSnapshot;
 import org.dzianisbova.domain.metrics.ThreadStat;
 
 import java.time.Duration;
+import java.util.ArrayList;
+import java.util.Comparator;
 import java.util.List;
 import java.util.concurrent.CopyOnWriteArrayList;
 import java.util.concurrent.atomic.AtomicReference;
@@ -72,6 +74,38 @@ public class PerThreadStatisticService implements StatisticsService {
         return val == 0 ? -1 : val;
     }
 
+    @Override
+    public long getP50() {
+        StatsSnapshot snapshot = statsSnapshot.get();
+        if (snapshot == null) return -1;
+        long val = snapshot.p50();
+        return val == 0 ? -1 : val;
+    }
+
+    @Override
+    public long getP90() {
+        StatsSnapshot snapshot = statsSnapshot.get();
+        if (snapshot == null) return -1;
+        long val = snapshot.p90();
+        return val == 0 ? -1 : val;
+    }
+
+    @Override
+    public long getP95() {
+        StatsSnapshot snapshot = statsSnapshot.get();
+        if (snapshot == null) return -1;
+        long val = snapshot.p95();
+        return val == 0 ? -1 : val;
+    }
+
+    @Override
+    public long getP99() {
+        StatsSnapshot snapshot = statsSnapshot.get();
+        if (snapshot == null) return -1;
+        long val = snapshot.p99();
+        return val == 0 ? -1 : val;
+    }
+
     public void refreshSnapshot() {
         statsSnapshot.set(aggregate());
     }
@@ -91,6 +125,7 @@ public class PerThreadStatisticService implements StatisticsService {
         long totalDuration = 0;
         long minDuration = Long.MAX_VALUE;
         long maxDuration = 0;
+        List<Long> successDurations = new ArrayList<>();
 
         for (ThreadStat stats : allStats) {
             totalSuccess += stats.getSuccess();
@@ -98,7 +133,24 @@ public class PerThreadStatisticService implements StatisticsService {
             totalDuration += stats.getTotalDuration();
             minDuration = Math.min(minDuration, stats.getMinDuration());
             maxDuration = Math.max(maxDuration, stats.getMaxDuration());
+            successDurations.addAll(stats.getSuccessDurations());
         }
-        return new StatsSnapshot(totalSuccess, totalErrors, totalDuration, minDuration, maxDuration);
+        successDurations.sort(Comparator.naturalOrder());
+        long p50 = percentile(successDurations, 50);
+        long p90 = percentile(successDurations, 90);
+        long p95 = percentile(successDurations, 95);
+        long p99 = percentile(successDurations, 99);
+        return new StatsSnapshot(totalSuccess, totalErrors, totalDuration, minDuration, maxDuration, p50, p90, p95, p99);
+    }
+
+    private static long percentile(List<Long> sortedList, double percentile) {
+        if (sortedList.isEmpty()) {
+            return 0L;
+        }
+        int size = sortedList.size();
+        int index = (int) Math.ceil(percentile / 100 * size) - 1;
+        if (index < 0) index = 0;
+        if (index >= size) index = size - 1;
+        return sortedList.get(index);
     }
 }

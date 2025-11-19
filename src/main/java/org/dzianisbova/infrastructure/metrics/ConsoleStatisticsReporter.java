@@ -31,12 +31,20 @@ public class ConsoleStatisticsReporter implements StatisticReporter {
             String minDurationStr = (minDuration == -1) ? "N/A" : Long.toString(minDuration);
             long maxDuration = service.getMaxSuccessDurationMillis();
             String maxDurationStr = (maxDuration == -1) ? "N/A" : Long.toString(maxDuration);
+            long p50 = service.getP50();
+            long p90 = service.getP90();
+            long p95 = service.getP95();
+            long p99 = service.getP99();
 
-            CONSOLE.info("Report: Total={}, Success={}, Errors={}, Avg Duration = {} ms, Min Duration = {} ms, Max Duration = {} ms",
+
+            CONSOLE.info("Report: Total={}, Success={}, Errors={}, Avg Duration = {} ms, Min Duration = {} ms, Max Duration = {} ms" +
+                            ", p50 = {} ms, p90 = {} ms, p95 = {} ms, p99 = {} ms",
                     total, success, errors,
                     String.format("%.3f", durationAvg),
                     minDurationStr,
-                    maxDurationStr);
+                    maxDurationStr,
+                    p50, p90, p95, p99
+            );
         }, 0, intervalMillis, TimeUnit.MILLISECONDS);
     }
 
