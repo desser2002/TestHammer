@@ -24,33 +24,24 @@ import java.util.concurrent.ScheduledExecutorService;
 import java.util.concurrent.TimeUnit;
 
 public class DefaultLoadTestExecutor implements LoadTestExecutor {
+    private final StatisticPublisher statisticPublisher;
     private final StatisticsService statisticsService;
     private final StatisticReporter statisticReporter;
     private final Logger logger;
     private HttpClient httpClient;
     private final FinalReporter finalReporter;
-    private static final long DEFAULT_TOKEN_BUCKET_CAPACITY = 1000;
+    private static final long DEFAULT_TOKEN_BUCKET_CAPACITY = 20;
     private ExecutorService executorService;
     private RequestExecutor requestExecutor;
     private RateLimiter rateLimiter;
 
-    public DefaultLoadTestExecutor(StatisticsService statisticsService, StatisticReporter statisticReporter, Logger logger) {
+
+    public DefaultLoadTestExecutor(StatisticPublisher statisticPublisher, StatisticsService statisticsService, StatisticReporter statisticReporter, Logger logger) {
+        this.statisticPublisher = statisticPublisher;
         this.statisticsService = statisticsService;
         this.statisticReporter = statisticReporter;
-        this.finalReporter = new FinalReporter(statisticsService);
+        this.finalReporter = new FinalReporter(statisticPublisher);
         this.logger = logger;
-    }
-
-    private void initializeRequestExecutors(LoadConfig loadConfig) {
-        httpClient = HttpClient.newHttpClient();
-        executorService = Executors.newFixedThreadPool(loadConfig.getThreadsCount());
-
-        rateLimiter = new TokenBucketRateLimiter(loadConfig.getLoadPhase().getStartRps(), DEFAULT_TOKEN_BUCKET_CAPACITY);
-
-        requestExecutor = new ConcurrentRequestExecutor(
-                logger,
-                httpClient,
-                statisticsService, rateLimiter);
     }
 
     @Override
@@ -68,21 +59,12 @@ public class DefaultLoadTestExecutor implements LoadTestExecutor {
             double currentRps = calculator.getCurrentRps(elapsed);
             rateLimiter.setTokensPerSecond(currentRps);
         }, 0, 500, TimeUnit.MILLISECONDS);
+        statisticPublisher.start(Duration.ofMillis(reportConfig.reportIntervalMillis()));
         statisticReporter.startReporting(reportConfig.reportIntervalMillis());
-        finalReporter.startLogging(Duration.ofSeconds(2));
+        finalReporter.start();
         runLoad(scenario, threadsCount, loadConfig.getTestDuration());
 
-        statisticReporter.stopReporting();
-        finalReporter.stopLogging();
-        try {
-            JsonExporter.exportJson("json", finalReporter.getFinalReport());
-        } catch (IOException e) {
-            throw new RuntimeException(e);
-        }
-        statisticsService.reset();
-        executorService.shutdownNow();
-        httpClient.close();
-        scheduler.shutdownNow();
+       shutdown(scheduler);
     }
 
     private void runWarmUp(Scenario scenario, int threadsCount, Duration warmUpDuration) {
@@ -103,6 +85,59 @@ public class DefaultLoadTestExecutor implements LoadTestExecutor {
             for (Runnable task : tasks) {
                 executorService.submit(task);
             }
+
+            // ВРЕМЕННО: для тестирования - задержка чтобы не переполнять очередь
+            try {
+                Thread.sleep(10);
+            } catch (InterruptedException e) {
+                Thread.currentThread().interrupt();
+                break;
+            }
         }
     }
+
+    private void initializeRequestExecutors(LoadConfig loadConfig) {
+        httpClient = HttpClient.newHttpClient();
+        executorService = Executors.newFixedThreadPool(loadConfig.getThreadsCount());
+
+        rateLimiter = new TokenBucketRateLimiter(loadConfig.getLoadPhase().getStartRps(), DEFAULT_TOKEN_BUCKET_CAPACITY);
+
+        requestExecutor = new ConcurrentRequestExecutor(
+                logger,
+                httpClient,
+                statisticsService, rateLimiter);
+    }
+
+    private void shutdown(ScheduledExecutorService scheduler)
+    {
+        scheduler.shutdownNow();
+        awaitTermination(scheduler);
+
+        statisticPublisher.stop();
+        statisticReporter.stopReporting();
+        finalReporter.stop();
+
+        try {
+            JsonExporter.exportJson("json", finalReporter.getFinalReport());
+        } catch (IOException e) {
+            throw new RuntimeException(e);
+        }
+
+        statisticsService.reset();
+
+        executorService.shutdownNow();
+        awaitTermination(executorService);
+
+        httpClient.close();
+    }
+
+    private void awaitTermination(ExecutorService executor) {
+        try {
+            executor.awaitTermination(10, TimeUnit.SECONDS);
+        } catch (InterruptedException e) {
+            Thread.currentThread().interrupt();
+        }
+    }
+
+
 }

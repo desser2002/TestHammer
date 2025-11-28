@@ -1,8 +1,6 @@
 package org.dzianisbova.infrastructure.metrics;
 
-import org.dzianisbova.domain.metrics.StatisticsService;
-import org.dzianisbova.domain.metrics.StatsSnapshot;
-import org.dzianisbova.domain.metrics.ThreadStat;
+import org.dzianisbova.domain.metrics.*;
 
 import java.time.Duration;
 import java.time.Instant;
@@ -10,16 +8,21 @@ import java.util.ArrayList;
 import java.util.Comparator;
 import java.util.List;
 import java.util.concurrent.CopyOnWriteArrayList;
-import java.util.concurrent.atomic.AtomicReference;
+import java.util.concurrent.Executors;
+import java.util.concurrent.ScheduledExecutorService;
+import java.util.concurrent.TimeUnit;
 
-public class PerThreadStatisticService implements StatisticsService {
+public class PerThreadStatisticService implements StatisticsService, StatisticPublisher {
     private final List<ThreadStat> allStats = new CopyOnWriteArrayList<>();
-    private final AtomicReference<StatsSnapshot> statsSnapshot = new AtomicReference<>(null);
+    private StatsSnapshot statsSnapshot;
     private final ThreadLocal<ThreadStat> threadStat = ThreadLocal.withInitial(() -> {
         ThreadStat stat = new ThreadStat();
         allStats.add(stat);
         return stat;
     });
+
+    private final List<StatisticObserver> statisticObservers = new CopyOnWriteArrayList<>();
+    private ScheduledExecutorService scheduler;
 
     @Override
     public void recordSuccess(Duration duration) {
@@ -32,98 +35,50 @@ public class PerThreadStatisticService implements StatisticsService {
     }
 
     @Override
-    public AtomicReference<StatsSnapshot> getStatsSnapshot() {
-        return statsSnapshot;
-    }
-
-    @Override
-    public long getTotalRequests() {
-        StatsSnapshot snapshot = statsSnapshot.get();
-        if (snapshot == null) return 0;
-        return snapshot.totalSuccess() + snapshot.totalErrors();
-    }
-
-    @Override
-    public long getSuccessCount() {
-        StatsSnapshot snapshot = statsSnapshot.get();
-        if (snapshot == null) return 0;
-        return snapshot.totalSuccess();
-    }
-
-    @Override
-    public long getErrorCount() {
-        StatsSnapshot snapshot = statsSnapshot.get();
-        if (snapshot == null) return 0;
-        return snapshot.totalErrors();
-    }
-
-    @Override
-    public double getAverageSuccessDuration() {
-        StatsSnapshot snapshot = statsSnapshot.get();
-        if (snapshot == null || snapshot.totalSuccess() == 0) return 0;
-        return (double) snapshot.totalDuration() / snapshot.totalSuccess();
-    }
-
-    @Override
-    public long getMinSuccessDurationMillis() {
-        StatsSnapshot snapshot = statsSnapshot.get();
-        if (snapshot == null) return -1;
-        long val = snapshot.minDuration();
-        return val == Long.MAX_VALUE ? -1 : val;
-    }
-
-    @Override
-    public long getMaxSuccessDurationMillis() {
-        StatsSnapshot snapshot = statsSnapshot.get();
-        if (snapshot == null) return -1;
-        long val = snapshot.maxDuration();
-        return val == 0 ? -1 : val;
-    }
-
-    @Override
-    public long getP50() {
-        StatsSnapshot snapshot = statsSnapshot.get();
-        if (snapshot == null) return -1;
-        long val = snapshot.p50();
-        return val == 0 ? -1 : val;
-    }
-
-    @Override
-    public long getP90() {
-        StatsSnapshot snapshot = statsSnapshot.get();
-        if (snapshot == null) return -1;
-        long val = snapshot.p90();
-        return val == 0 ? -1 : val;
-    }
-
-    @Override
-    public long getP95() {
-        StatsSnapshot snapshot = statsSnapshot.get();
-        if (snapshot == null) return -1;
-        long val = snapshot.p95();
-        return val == 0 ? -1 : val;
-    }
-
-    @Override
-    public long getP99() {
-        StatsSnapshot snapshot = statsSnapshot.get();
-        if (snapshot == null) return -1;
-        long val = snapshot.p99();
-        return val == 0 ? -1 : val;
-    }
-
-    public void refreshSnapshot() {
-        statsSnapshot.set(aggregate());
-    }
-
-    @Override
     public void reset() {
         for (ThreadStat stat : allStats) {
             stat.resetCounters();
         }
         threadStat.remove();
-        statsSnapshot.set(null);
+        statsSnapshot = null;
     }
+
+    @Override
+    public void start(Duration interval) {
+        if (scheduler != null && !scheduler.isShutdown()) {
+            return;
+        }
+
+        scheduler = Executors.newSingleThreadScheduledExecutor();
+        scheduler.scheduleAtFixedRate(() -> {
+                    refreshSnapshot();
+                    notifyObservers();
+                }
+                , 0, interval.toMillis(), TimeUnit.MILLISECONDS);
+    }
+
+    @Override
+    public void stop() {
+        if (scheduler != null) {
+            scheduler.shutdownNow();
+            try {
+                scheduler.awaitTermination(5, TimeUnit.SECONDS);
+            } catch (InterruptedException e) {
+                Thread.currentThread().interrupt();
+            }
+        }
+    }
+
+    @Override
+    public void addObserver(StatisticObserver observer) {
+        statisticObservers.add(observer);
+    }
+
+    @Override
+    public void removeObserver(StatisticObserver observer) {
+        statisticObservers.remove(observer);
+    }
+
 
     private StatsSnapshot aggregate() {
         long totalSuccess = 0;
@@ -141,13 +96,30 @@ public class PerThreadStatisticService implements StatisticsService {
             maxDuration = Math.max(maxDuration, stats.getMaxDuration());
             successDurations.addAll(stats.getSuccessDurations());
         }
+
         successDurations.sort(Comparator.naturalOrder());
-        long p50 = percentile(successDurations, 50);
-        long p90 = percentile(successDurations, 90);
-        long p95 = percentile(successDurations, 95);
-        long p99 = percentile(successDurations, 99);
-        Instant creationTime = Instant.now();
-        return new StatsSnapshot(totalSuccess, totalErrors, totalDuration, minDuration, maxDuration, p50, p90, p95, p99, creationTime);
+        return new StatsSnapshot(
+                totalSuccess,
+                totalErrors,
+                totalDuration,
+                minDuration,
+                maxDuration,
+                percentile(successDurations, 50),
+                percentile(successDurations, 90),
+                percentile(successDurations, 95),
+                percentile(successDurations, 99),
+                Instant.now()
+        );
+    }
+
+    private synchronized void notifyObservers() {
+        if (statsSnapshot != null) {
+            statisticObservers.forEach(observer -> observer.onStatisticsUpdated(statsSnapshot));
+        }
+    }
+
+    private synchronized void refreshSnapshot() {
+        statsSnapshot = aggregate();
     }
 
     private static long percentile(List<Long> sortedList, double percentile) {
