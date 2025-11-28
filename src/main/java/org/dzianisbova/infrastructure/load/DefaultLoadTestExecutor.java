@@ -42,12 +42,11 @@ public class DefaultLoadTestExecutor implements LoadTestExecutor {
     @Override
     public void executeTest(Scenario scenario, LoadConfig loadConfig, ReportConfig reportConfig) {
         initializeRequestExecutors(loadConfig);
-        int threadsCount = loadConfig.getThreadsCount();
 
         LoadPhase loadPhase = loadConfig.getLoadPhase();
         LoadPhaseCalculator calculator = new LinearRampUpCalculator(loadPhase);
         Instant startTime = Instant.now();
-        runWarmUp(scenario, threadsCount, loadConfig.getWarmUpDuration());
+        runWarmUp(scenario, loadConfig.getWarmUpDuration());
         ScheduledExecutorService scheduler = Executors.newSingleThreadScheduledExecutor();
         scheduler.scheduleAtFixedRate(() -> {
             Duration elapsed = Duration.between(startTime, Instant.now());
@@ -57,20 +56,20 @@ public class DefaultLoadTestExecutor implements LoadTestExecutor {
         statisticPublisher.start(Duration.ofMillis(reportConfig.reportIntervalMillis()));
         statisticReporter.startReporting(reportConfig.reportIntervalMillis());
         finalReporter.start();
-        runLoad(scenario, threadsCount, loadConfig.getTestDuration());
+        runLoad(scenario, loadConfig.getTestDuration());
 
         shutdown(scheduler);
     }
 
-    private void runWarmUp(Scenario scenario, int threadsCount, Duration warmUpDuration) {
+    private void runWarmUp(Scenario scenario, Duration warmUpDuration) {
         if (!warmUpDuration.isZero() && !warmUpDuration.isNegative()) {
-            runLoad(scenario, threadsCount, warmUpDuration);
+            runLoad(scenario, warmUpDuration);
             finalReporter.reset();
             statisticsService.reset();
         }
     }
 
-    private void runLoad(Scenario scenario, int threadsCount, Duration duration) {
+    private void runLoad(Scenario scenario, Duration duration) {
         Instant endTime = Instant.now().plus(duration);
 
         while (Instant.now().isBefore(endTime)) {
