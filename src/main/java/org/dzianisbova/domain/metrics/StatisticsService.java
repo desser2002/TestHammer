@@ -1,11 +1,14 @@
 package org.dzianisbova.domain.metrics;
 
 import java.time.Duration;
+import java.util.concurrent.atomic.AtomicReference;
 
 public interface StatisticsService {
     void recordSuccess(Duration duration);
 
     void recordError(Duration duration);
+
+    AtomicReference<StatsSnapshot> getStatsSnapshot();
 
     long getTotalRequests();
 

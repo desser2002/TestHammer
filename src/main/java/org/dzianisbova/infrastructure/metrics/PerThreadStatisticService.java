@@ -5,6 +5,7 @@ import org.dzianisbova.domain.metrics.StatsSnapshot;
 import org.dzianisbova.domain.metrics.ThreadStat;
 
 import java.time.Duration;
+import java.time.Instant;
 import java.util.ArrayList;
 import java.util.Comparator;
 import java.util.List;
@@ -28,6 +29,11 @@ public class PerThreadStatisticService implements StatisticsService {
     @Override
     public void recordError(Duration duration) {
         threadStat.get().recordError();
+    }
+
+    @Override
+    public AtomicReference<StatsSnapshot> getStatsSnapshot() {
+        return statsSnapshot;
     }
 
     @Override
@@ -140,7 +146,8 @@ public class PerThreadStatisticService implements StatisticsService {
         long p90 = percentile(successDurations, 90);
         long p95 = percentile(successDurations, 95);
         long p99 = percentile(successDurations, 99);
-        return new StatsSnapshot(totalSuccess, totalErrors, totalDuration, minDuration, maxDuration, p50, p90, p95, p99);
+        Instant creationTime = Instant.now();
+        return new StatsSnapshot(totalSuccess, totalErrors, totalDuration, minDuration, maxDuration, p50, p90, p95, p99, creationTime);
     }
 
     private static long percentile(List<Long> sortedList, double percentile) {
