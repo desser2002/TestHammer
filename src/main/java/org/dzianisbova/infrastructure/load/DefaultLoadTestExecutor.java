@@ -16,12 +16,7 @@ import java.io.IOException;
 import java.net.http.HttpClient;
 import java.time.Duration;
 import java.time.Instant;
-import java.util.ArrayList;
-import java.util.List;
-import java.util.concurrent.ExecutorService;
-import java.util.concurrent.Executors;
-import java.util.concurrent.ScheduledExecutorService;
-import java.util.concurrent.TimeUnit;
+import java.util.concurrent.*;
 
 public class DefaultLoadTestExecutor implements LoadTestExecutor {
     private final StatisticPublisher statisticPublisher;
@@ -30,8 +25,8 @@ public class DefaultLoadTestExecutor implements LoadTestExecutor {
     private final Logger logger;
     private HttpClient httpClient;
     private final FinalReporter finalReporter;
-    private static final long DEFAULT_TOKEN_BUCKET_CAPACITY = 20;
-    private ExecutorService executorService;
+    private static final int DEFAULT_TOKEN_BUCKET_CAPACITY = 20;
+    private ThreadPoolExecutor executorService;
     private RequestExecutor requestExecutor;
     private RateLimiter rateLimiter;
 
@@ -64,7 +59,7 @@ public class DefaultLoadTestExecutor implements LoadTestExecutor {
         finalReporter.start();
         runLoad(scenario, threadsCount, loadConfig.getTestDuration());
 
-       shutdown(scheduler);
+        shutdown(scheduler);
     }
 
     private void runWarmUp(Scenario scenario, int threadsCount, Duration warmUpDuration) {
@@ -77,39 +72,46 @@ public class DefaultLoadTestExecutor implements LoadTestExecutor {
 
     private void runLoad(Scenario scenario, int threadsCount, Duration duration) {
         Instant endTime = Instant.now().plus(duration);
-        while (Instant.now().isBefore(endTime)) {
-            List<Runnable> tasks = new ArrayList<>();
-            for (int i = 0; i < threadsCount; i++) {
-                tasks.add(() -> scenario.run(requestExecutor));
-            }
-            for (Runnable task : tasks) {
-                executorService.submit(task);
-            }
 
-            // ВРЕМЕННО: для тестирования - задержка чтобы не переполнять очередь
+        while (Instant.now().isBefore(endTime)) {
             try {
-                Thread.sleep(10);
+                rateLimiter.acquire();
             } catch (InterruptedException e) {
                 Thread.currentThread().interrupt();
-                break;
+                return;
             }
+            executorService.submit(() -> scenario.run(requestExecutor));
         }
     }
 
     private void initializeRequestExecutors(LoadConfig loadConfig) {
         httpClient = HttpClient.newHttpClient();
-        executorService = Executors.newFixedThreadPool(loadConfig.getThreadsCount());
 
-        rateLimiter = new TokenBucketRateLimiter(loadConfig.getLoadPhase().getStartRps(), DEFAULT_TOKEN_BUCKET_CAPACITY);
+        int threads = loadConfig.getThreadsCount();
 
+        BlockingQueue<Runnable> workQueue = new ArrayBlockingQueue<>(threads * 2);
+
+        executorService = new ThreadPoolExecutor(
+                threads,
+                threads,
+                0L,
+                TimeUnit.MILLISECONDS,
+                workQueue,
+                new ThreadPoolExecutor.CallerRunsPolicy()
+        );
+
+        rateLimiter = new TokenBucketRateLimiter(
+                loadConfig.getLoadPhase().getStartRps(),
+                DEFAULT_TOKEN_BUCKET_CAPACITY
+        );
         requestExecutor = new ConcurrentRequestExecutor(
                 logger,
                 httpClient,
-                statisticsService, rateLimiter);
+                statisticsService
+        );
     }
 
-    private void shutdown(ScheduledExecutorService scheduler)
-    {
+    private void shutdown(ScheduledExecutorService scheduler) {
         scheduler.shutdownNow();
         awaitTermination(scheduler);
 
@@ -125,7 +127,7 @@ public class DefaultLoadTestExecutor implements LoadTestExecutor {
 
         statisticsService.reset();
 
-        executorService.shutdownNow();
+        executorService.shutdown();
         awaitTermination(executorService);
 
         httpClient.close();
