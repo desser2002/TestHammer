@@ -4,6 +4,7 @@ import org.dzianisbova.domain.api.Scenario;
 import org.dzianisbova.domain.load.LoadConfig;
 import org.dzianisbova.domain.load.LoadTestExecutor;
 import org.dzianisbova.domain.load.RequestExecutor;
+import org.dzianisbova.domain.load.ScenarioTask;
 import org.dzianisbova.domain.load.loadphase.LinearRampUpCalculator;
 import org.dzianisbova.domain.load.loadphase.LoadPhase;
 import org.dzianisbova.domain.load.loadphase.LoadPhaseCalculator;
@@ -11,6 +12,8 @@ import org.dzianisbova.domain.load.ratelimiter.RateLimiter;
 import org.dzianisbova.domain.logging.Logger;
 import org.dzianisbova.domain.metrics.*;
 import org.dzianisbova.infrastructure.load.ratelimiter.TokenBucketRateLimiter;
+import org.dzianisbova.infrastructure.load.requestorchestrator.RateLimitedTaskDispatcher;
+import org.dzianisbova.infrastructure.load.taskproducer.QueueFeeder;
 
 import java.io.IOException;
 import java.net.http.HttpClient;
@@ -26,9 +29,10 @@ public class DefaultLoadTestExecutor implements LoadTestExecutor {
     private HttpClient httpClient;
     private final FinalReporter finalReporter;
     private static final int DEFAULT_TOKEN_BUCKET_CAPACITY = 20;
-    private ThreadPoolExecutor executorService;
+    private ExecutorService executorService;
     private RequestExecutor requestExecutor;
     private RateLimiter rateLimiter;
+    private BlockingQueue<Runnable> taskQueue;
 
 
     public DefaultLoadTestExecutor(StatisticPublisher statisticPublisher, StatisticsService statisticsService, StatisticReporter statisticReporter, Logger logger) {
@@ -46,19 +50,23 @@ public class DefaultLoadTestExecutor implements LoadTestExecutor {
         LoadPhase loadPhase = loadConfig.getLoadPhase();
         LoadPhaseCalculator calculator = new LinearRampUpCalculator(loadPhase);
         Instant startTime = Instant.now();
+
         runWarmUp(scenario, loadConfig.getWarmUpDuration());
-        ScheduledExecutorService scheduler = Executors.newSingleThreadScheduledExecutor();
-        scheduler.scheduleAtFixedRate(() -> {
+
+        ScheduledExecutorService rampUpScheduler = Executors.newSingleThreadScheduledExecutor();
+
+        rampUpScheduler.scheduleAtFixedRate(() -> {
             Duration elapsed = Duration.between(startTime, Instant.now());
             double currentRps = calculator.getCurrentRps(elapsed);
             rateLimiter.setTokensPerSecond(currentRps);
         }, 0, 500, TimeUnit.MILLISECONDS);
+
         statisticPublisher.start(Duration.ofMillis(reportConfig.reportIntervalMillis()));
         statisticReporter.startReporting(reportConfig.reportIntervalMillis());
         finalReporter.start();
         runLoad(scenario, loadConfig.getTestDuration());
 
-        shutdown(scheduler);
+        shutdown(rampUpScheduler);
     }
 
     private void runWarmUp(Scenario scenario, Duration warmUpDuration) {
@@ -70,16 +78,19 @@ public class DefaultLoadTestExecutor implements LoadTestExecutor {
     }
 
     private void runLoad(Scenario scenario, Duration duration) {
-        Instant endTime = Instant.now().plus(duration);
 
-        while (Instant.now().isBefore(endTime)) {
-            try {
-                rateLimiter.acquire();
-            } catch (InterruptedException e) {
-                Thread.currentThread().interrupt();
-                return;
-            }
-            executorService.submit(() -> scenario.run(requestExecutor));
+        ScenarioTask scenarioTask = new ScenarioTask(scenario, requestExecutor);
+        QueueFeeder queueFeeder = new QueueFeeder(taskQueue, scenarioTask, duration);
+
+        RateLimitedTaskDispatcher dispatcher = new RateLimitedTaskDispatcher(taskQueue, executorService, rateLimiter);
+
+        queueFeeder.start();
+        dispatcher.start();
+
+        try {
+            Thread.sleep(duration.toMillis());
+        } catch (InterruptedException e) {
+            Thread.currentThread().interrupt();
         }
     }
 
@@ -87,17 +98,11 @@ public class DefaultLoadTestExecutor implements LoadTestExecutor {
         httpClient = HttpClient.newHttpClient();
 
         int threads = loadConfig.getThreadsCount();
+        int queueCapacity = threads * 10;
 
-        BlockingQueue<Runnable> workQueue = new ArrayBlockingQueue<>(threads * 2);
+        taskQueue = new ArrayBlockingQueue<>(queueCapacity);
 
-        executorService = new ThreadPoolExecutor(
-                threads,
-                threads,
-                0L,
-                TimeUnit.MILLISECONDS,
-                workQueue,
-                new ThreadPoolExecutor.CallerRunsPolicy()
-        );
+        executorService = Executors.newFixedThreadPool(threads);
 
         rateLimiter = new TokenBucketRateLimiter(
                 loadConfig.getLoadPhase().getStartRps(),
@@ -126,7 +131,7 @@ public class DefaultLoadTestExecutor implements LoadTestExecutor {
 
         statisticsService.reset();
 
-        executorService.shutdown();
+        executorService.shutdownNow();
         awaitTermination(executorService);
 
         httpClient.close();
@@ -134,8 +139,11 @@ public class DefaultLoadTestExecutor implements LoadTestExecutor {
 
     private void awaitTermination(ExecutorService executor) {
         try {
-            executor.awaitTermination(10, TimeUnit.SECONDS);
+            if (!executor.awaitTermination(10, TimeUnit.SECONDS)) {
+                executor.shutdownNow();
+            }
         } catch (InterruptedException e) {
+            executor.shutdownNow();
             Thread.currentThread().interrupt();
         }
     }

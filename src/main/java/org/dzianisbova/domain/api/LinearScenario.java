@@ -4,7 +4,7 @@ import org.dzianisbova.domain.load.RequestExecutor;
 
 import java.util.List;
 
-public class LinearScenario implements Scenario{
+public class LinearScenario implements Scenario {
     private final List<Request> requests;
 
     public LinearScenario(List<Request> requests) {
@@ -16,5 +16,10 @@ public class LinearScenario implements Scenario{
         for (Request request : requests) {
             executor.execute(request);
         }
+    }
+
+    @Override
+    public int getRequestCount() {
+        return requests.size();
     }
 }
