@@ -7,7 +7,6 @@ import org.dzianisbova.domain.load.LoadTestExecutor;
 import org.dzianisbova.domain.load.loadphase.LinearRampUpPhase;
 import org.dzianisbova.domain.metrics.ReportConfig;
 import org.dzianisbova.domain.metrics.StatisticReporter;
-import org.dzianisbova.domain.metrics.StatisticsService;
 import org.dzianisbova.infrastructure.load.DefaultLoadTestExecutor;
 import org.dzianisbova.infrastructure.logging.InMemoryLogger;
 import org.dzianisbova.infrastructure.metrics.ConsoleStatisticsReporter;
@@ -30,11 +29,11 @@ public class Main {
                 .duration(Duration.ofMinutes(2))
                 .build();
 
-        StatisticsService statisticsService = new PerThreadStatisticService();
-        StatisticReporter reporter = new ConsoleStatisticsReporter(statisticsService);
+        PerThreadStatisticService perThreadStatisticService = new PerThreadStatisticService();
+        StatisticReporter reporter = new ConsoleStatisticsReporter(perThreadStatisticService);
         ReportConfig reportConfig = new ReportConfig(1000);
 
-        LoadTestExecutor loadTestExecutor = new DefaultLoadTestExecutor(statisticsService, reporter, new InMemoryLogger());
+        LoadTestExecutor loadTestExecutor = new DefaultLoadTestExecutor(perThreadStatisticService, perThreadStatisticService, reporter, new InMemoryLogger());
 
         List<Request> requests = List.of(getAllDrivers, getAllRides);
         loadTestExecutor.executeTest(new LinearScenario(requests), loadConfig, reportConfig);

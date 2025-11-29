@@ -7,19 +7,5 @@ public interface StatisticsService {
 
     void recordError(Duration duration);
 
-    long getTotalRequests();
-
-    long getSuccessCount();
-
-    long getErrorCount();
-
-    double getAverageSuccessDuration();
-
-    long getMinSuccessDurationMillis();
-
-    long getMaxSuccessDurationMillis();
-
     void reset();
-
-    void refreshSnapshot();
 }
