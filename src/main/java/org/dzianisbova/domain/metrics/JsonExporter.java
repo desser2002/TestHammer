@@ -24,7 +24,9 @@ public class JsonExporter {
         String filename = "report_" + timestamp + ".json";
         File folder = new File(folderPath);
         if (!folder.exists()) {
-            folder.mkdirs();
+            if (!folder.mkdirs() && !folder.exists()) {
+                throw new IOException("Failed to create directory: " + folder.getAbsolutePath());
+            }
         }
 
         File file = new File(folder, filename);

@@ -39,6 +39,7 @@ public class PerThreadStatisticService implements StatisticsService, StatisticPu
         for (ThreadStat stat : allStats) {
             stat.resetCounters();
         }
+        allStats.clear();
         threadStat.remove();
         statsSnapshot = null;
     }
