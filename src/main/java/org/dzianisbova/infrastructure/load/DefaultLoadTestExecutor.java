@@ -49,10 +49,10 @@ public class DefaultLoadTestExecutor implements LoadTestExecutor {
 
         LoadPhase loadPhase = loadConfig.getLoadPhase();
         LoadPhaseCalculator calculator = new LinearRampUpCalculator(loadPhase);
-        Instant startTime = Instant.now();
 
         runWarmUp(scenario, loadConfig.getWarmUpDuration());
 
+        Instant startTime = Instant.now();
         ScheduledExecutorService rampUpScheduler = Executors.newSingleThreadScheduledExecutor();
 
         rampUpScheduler.scheduleAtFixedRate(() -> {
