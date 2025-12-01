@@ -1,6 +1,8 @@
 package org.dzianisbova.domain.metrics;
 
 import java.time.Duration;
+import java.util.ArrayList;
+import java.util.List;
 
 public class ThreadStat {
     private long success = 0;
@@ -8,6 +10,7 @@ public class ThreadStat {
     private long totalDuration = 0;
     private long minDuration = Long.MAX_VALUE;
     private long maxDuration = 0;
+    private final List<Long> successDurations = new ArrayList<>();
 
     public long getSuccess() {
         return success;
@@ -29,11 +32,16 @@ public class ThreadStat {
         return maxDuration;
     }
 
+    public List<Long> getSuccessDurations() {
+        return successDurations;
+    }
+
     public void recordSuccess(Duration duration) {
-        long millis = duration.toMillis();
+        long requestDurationMillis = duration.toMillis();
         success++;
-        totalDuration += millis;
-        updateMinMax(millis);
+        totalDuration += requestDurationMillis;
+        successDurations.add(requestDurationMillis);
+        updateMinMax(requestDurationMillis);
     }
 
     public void recordError() {

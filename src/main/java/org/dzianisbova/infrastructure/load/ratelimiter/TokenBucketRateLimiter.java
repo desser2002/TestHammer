@@ -63,9 +63,10 @@ public class TokenBucketRateLimiter implements RateLimiter {
     public void setTokensPerSecond(double tokensPerSecond) {
         lock.lock();
         try {
+            refillTokens();
             this.tokensPerSecond = tokensPerSecond;
             this.lastRefillTimeNanos = System.nanoTime();
-            refillTokens();
+            tokensAvailable.signalAll();
         } finally {
             lock.unlock();
         }
