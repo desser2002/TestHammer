@@ -147,6 +147,4 @@ public class DefaultLoadTestExecutor implements LoadTestExecutor {
             Thread.currentThread().interrupt();
         }
     }
-
-
 }

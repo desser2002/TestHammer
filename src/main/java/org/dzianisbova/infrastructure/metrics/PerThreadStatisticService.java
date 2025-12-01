@@ -35,7 +35,7 @@ public class PerThreadStatisticService implements StatisticsService, StatisticPu
     }
 
     @Override
-    public void reset() {
+    public synchronized void reset() {
         for (ThreadStat stat : allStats) {
             stat.resetCounters();
         }
@@ -51,10 +51,7 @@ public class PerThreadStatisticService implements StatisticsService, StatisticPu
         }
 
         scheduler = Executors.newSingleThreadScheduledExecutor();
-        scheduler.scheduleAtFixedRate(() -> {
-                    refreshSnapshot();
-                    notifyObservers();
-                }
+        scheduler.scheduleAtFixedRate(this::refreshAndNotify
                 , 0, interval.toMillis(), TimeUnit.MILLISECONDS);
     }
 
@@ -113,14 +110,9 @@ public class PerThreadStatisticService implements StatisticsService, StatisticPu
         );
     }
 
-    private synchronized void notifyObservers() {
-        if (statsSnapshot != null) {
-            statisticObservers.forEach(observer -> observer.onStatisticsUpdated(statsSnapshot));
-        }
-    }
-
-    private synchronized void refreshSnapshot() {
+    private synchronized void refreshAndNotify() {
         statsSnapshot = aggregate();
+        statisticObservers.forEach(observer -> observer.onStatisticsUpdated(statsSnapshot));
     }
 
     private static long percentile(List<Long> sortedList, double percentile) {

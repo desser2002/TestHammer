@@ -39,14 +39,11 @@ public class RateLimitedTaskDispatcher implements RequestOrchestrator {
         while (!Thread.currentThread().isInterrupted()) {
             try {
 
-                ScenarioTask scenarioTask = (ScenarioTask) taskQueue.poll();
-                if (scenarioTask != null) {
-
-                    for (int i = 0; i < scenarioTask.getRequestCount(); i++) {
-                        rateLimiter.acquire();
-                    }
-                    executorService.submit(scenarioTask);
+                ScenarioTask scenarioTask = (ScenarioTask) taskQueue.take();
+                for (int i = 0; i < scenarioTask.getRequestCount(); i++) {
+                    rateLimiter.acquire();
                 }
+                executorService.submit(scenarioTask);
             } catch (InterruptedException e) {
                 Thread.currentThread().interrupt();
                 break;
